@@ -17,6 +17,7 @@ Guidance for automated coding agents and maintainers of The Trerrote Connection.
 - **Text is capitals and the glyphs of `FONT_ORDER`** in `tools/build_art.py`, 40 characters per line at most.
 - **Colours go through `tools/palette.py`:** two colours on a screen may not share a cube cell.
 - **A row that changes must be marked dirty.** `tests/test_game.c` compares the panel with a clean repaint.
+- **On the board, pixels and presents are what cost.** Host tests can't see it, so a renderer change needs a run on hardware. See `docs/graphics.md`.
 - **Never publish** to the Cartridge Store from scripts. No credentials in the repository.
 - **Do not modify the PRG32 checkout.** Report firmware findings in `docs/firmware-notes.md`.
 - **Do not test on an attached board without asking:** it overwrites a cartridge slot.

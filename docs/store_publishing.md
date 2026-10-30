@@ -1,6 +1,6 @@
 # Cartridge Store
 
-`scripts/pack-store-bundle.sh` builds `dist/the-trerrote-connection-1.0.0-store.zip`: both cartridges, icon, splash, and a
+`scripts/pack-store-bundle.sh` builds `dist/the-trerrote-connection-1.0.1-store.zip`: both cartridges, icon, splash, and a
 manifest generated from `metadata/`. `tools/validate_bundle.py` checks it, using the Store's own ingestion code when
 `../CartridgeStore` and its requirements are available.
 

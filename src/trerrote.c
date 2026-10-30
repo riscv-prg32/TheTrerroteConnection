@@ -10,12 +10,13 @@
  *   1. A row buffer in cartridge memory is filled with the row's background: a band
  *      of a view (run-length rows, decoded one at a time) or the road's spans.
  *   2. Every sprite crossing that row is scaled into the buffer, far to near.
- *   3. Text goes on top, and the finished row reaches the firmware as a one-row,
- *      8-bit indexed sprite.
+ *   3. Text goes on top, and the part of the row that changed reaches the firmware as
+ *      runs of one indexed colour (see send_row).
  *
- * So nothing is ever erased: a row is simply replaced, and only rows that changed are
- * sent. No full picture is held in the cartridge's 64 KiB, and the display never shows
- * a half-painted frame. Portable cartridges have no relocations: no pointer may appear
+ * So nothing is ever erased, and no full picture is held in the cartridge's 64 KiB.
+ * Pixels sent to the display are what limits the frame rate on the ESP32-C6, so each
+ * row tracks the span that changed, and the sky and the road are flushed separately: a
+ * palm's top then travels as a small box, not as a band across the whole screen. Portable cartridges have no relocations: no pointer may appear
  * in initialised static data (tools/check_relocatable.py proves it).
  */
 #include "prg32.h"
@@ -55,6 +56,7 @@ void *memcpy(void *dst, const void *src, size_t n) {
 #define HUD_H 16
 #define PARALLAX 24
 #define MAX_SPRITES 44
+#define MAX_ROW_RUNS 80
 #define PALETTE_SIZE (FIXED_COUNT + VIEW_COLORS)
 #define IDLE_TO_DEMO_TICKS 300
 #define DEMO_TICKS 1200
@@ -77,6 +79,7 @@ static struct {
     uint8_t line[VIEW_W + 8];
     uint8_t src[128];
     uint16_t palette[PALETTE_SIZE];
+    uint8_t cell[PALETTE_SIZE];     /* each colour's index on the framebuffer */
     prg32_indexed_sprite_t row;
 
     /* The text layer: one colour per line. */
@@ -87,20 +90,24 @@ static struct {
 
     spr_t cur[MAX_SPRITES], prev[MAX_SPRITES];
     int count, prev_count;
-    uint8_t dirty[PRG32_GAME_H];
+    uint8_t dirty[PRG32_GAME_H];      /* 0 clean, 1 whole row, 2 only rx0..rx1 */
+    int16_t rx0[PRG32_GAME_H], rx1[PRG32_GAME_H];
 
     /* The road as computed for this frame: one entry per row. */
     int16_t center[TR_ROWS + 1];
     uint8_t width[TR_ROWS + 1], ground_l[TR_ROWS + 1], ground_r[TR_ROWS + 1];
     int32_t z_row[TR_ROWS + 1];
     int16_t unit[TR_ROWS + 1];
+    /* The road as last sent, to know which part of each row has changed. */
+    int16_t shown_left[TR_ROWS + 1], shown_right[TR_ROWS + 1];
+    uint8_t shown_ground_l[TR_ROWS + 1], shown_ground_r[TR_ROWS + 1];
 
     uint8_t app, demo, view, view_shown, lower, hud;
     int16_t shift, shift_shown;
     int32_t road_pos_shown;
     int16_t road_x_shown;
     uint32_t app_tick, best;
-    uint32_t last_input, last_ms, tick_accum;
+    uint32_t last_input, last_ms, tick_accum, pending_pressed;
     uint8_t load_count, engine_timer, intro_level;
 
     uint32_t hud_seconds, hud_score;
@@ -124,6 +131,22 @@ static uint8_t cube_index(uint16_t color) {
     return (uint8_t)(16u + r * 36u + g * 6u + b);
 }
 
+/* Row y has changed between x0 and x1. A row already marked whole stays whole. */
+static void mark_span(int y, int x0, int x1) {
+    if (y < 0 || y >= PRG32_GAME_H || v.dirty[y] == 1) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 > PRG32_GAME_W) x1 = PRG32_GAME_W;
+    if (x0 >= x1) return;
+    if (v.dirty[y] == 0) {
+        v.dirty[y] = 2;
+        v.rx0[y] = (int16_t)x0;
+        v.rx1[y] = (int16_t)x1;
+    } else {
+        if (x0 < v.rx0[y]) v.rx0[y] = (int16_t)x0;
+        if (x1 > v.rx1[y]) v.rx1[y] = (int16_t)x1;
+    }
+}
+
 static void dirty_all(void) {
     for (int y = 0; y < PRG32_GAME_H; ++y) v.dirty[y] = 1;
 }
@@ -134,7 +157,10 @@ static void view_load(int n) {
     v.view_shown = (uint8_t)n;
     for (int i = 0; i < FIXED_COUNT; ++i) v.palette[i] = fixed_palette[i];
     for (int i = 0; i < VIEW_COLORS; ++i) v.palette[FIXED_COUNT + i] = view_palette[n * VIEW_COLORS + i];
-    for (int i = 0; i < PALETTE_SIZE; ++i) prg32_palette_set(cube_index(v.palette[i]), v.palette[i]);
+    for (int i = 0; i < PALETTE_SIZE; ++i) {
+        v.cell[i] = cube_index(v.palette[i]);
+        prg32_palette_set(v.cell[i], v.palette[i]);
+    }
     dirty_all();
 }
 
@@ -166,14 +192,15 @@ static int text_len(const char *s) {
 }
 
 static void text_at(int x, int y, const char *s, int color) {
-    int changed = v.text_color[y] != color;
+    int whole = v.text_color[y] != color || v.text_big[y];
     v.text_color[y] = (uint8_t)color;
     for (; *s && x < 40; ++s, ++x) {
-        if (x < 0) continue;
-        if (v.text[y][x] != *s) changed = 1;
+        if (x < 0 || v.text[y][x] == *s) continue;
         v.text[y][x] = *s;
+        /* A changing clock should not cost a whole row. One pixel more for the shadow. */
+        for (int r = 0; r < 8; ++r) mark_span(y * 8 + r, x * 8, x * 8 + 9);
     }
-    if (changed) {
+    if (whole) {
         int bottom = v.text_big[y] ? 16 : 8;
         for (int r = 0; r < bottom && y * 8 + r < PRG32_GAME_H; ++r) v.dirty[y * 8 + r] = 1;
     }
@@ -356,11 +383,16 @@ static void road_compute(void) {
     }
 }
 
-static void ground_colors(int ground, int alternate, uint8_t *out) {
-    static const uint8_t a[5] = {C_PAVE, C_SEA, C_SAND, C_GRASS, C_TUFF};
-    static const uint8_t b[5] = {C_PAVE2, C_SEA2, C_SAND2, C_GRASS2, C_PAVE2};
-    *out = alternate ? b[ground] : a[ground];
+/* Flat, deliberately: bands of ground passing at speed would make every row change
+ * from edge to edge, and the display cannot afford it. Kerbs and road marks carry the
+ * sense of speed. */
+static uint8_t ground_color(int ground) {
+    static const uint8_t colors[5] = {C_PAVE, C_SEA, C_SAND, C_GRASS, C_TUFF};
+    return colors[ground];
 }
+
+static int road_half(int r) { return (v.unit[r] * v.width[r]) >> 4; }
+static int road_kerb(int half) { return half / 10 + 1; }
 
 static void fill(uint8_t *line, int x0, int x1, uint8_t color) {
     if (x0 < 0) x0 = 0;
@@ -371,12 +403,10 @@ static void fill(uint8_t *line, int x0, int x1, uint8_t color) {
 static void draw_road_row(uint8_t *line, int r) {
     uint32_t z = (uint32_t)game.pos + (uint32_t)v.z_row[r];
     int center = v.center[r];
-    int half = (v.unit[r] * v.width[r]) >> 4;
-    int stripe = (z >> 9) & 1u, band = (z >> 10) & 1u;
-    uint8_t lg, rg;
-    ground_colors(v.ground_l[r], band, &lg);
-    ground_colors(v.ground_r[r], band, &rg);
-    int kerb = half / 10 + 1;
+    int half = road_half(r);
+    int stripe = (z >> 9) & 1u;
+    uint8_t lg = ground_color(v.ground_l[r]), rg = ground_color(v.ground_r[r]);
+    int kerb = road_kerb(half);
     fill(line, 0, center - half - kerb, lg);
     fill(line, center + half + kerb, PRG32_GAME_W, rg);
     uint8_t kerb_color = stripe ? C_RED : C_CREAM;
@@ -535,7 +565,30 @@ static void build_road_sprites(void) {
 
 /* ---- the row compositor ------------------------------------------------------ */
 
-static void draw_row(int y) {
+/* Hand a finished row to the firmware. Most rows are a few long runs of one colour,
+ * and a rectangle fills its pixels with memset, where an 8-bit sprite goes through a
+ * per-pixel loop and rebuilds its palette map first: on the ESP32-C6 that was the
+ * largest cost of a frame. A very busy row (a skyline, say) is cheaper as a sprite. */
+static void send_row(const uint8_t *line, int y, int x0, int x1) {
+    int runs = 1;
+    for (int x = x0 + 1; x < x1 && runs <= MAX_ROW_RUNS; ++x) runs += line[x] != line[x - 1];
+    if (runs > MAX_ROW_RUNS) {
+        v.row.pixels = line + x0;
+        v.row.width = (uint16_t)(x1 - x0);
+        prg32_sprite_draw_indexed(x0, y, &v.row, 0);
+        return;
+    }
+    int x = x0;
+    while (x < x1) {
+        uint8_t color = line[x];
+        int end = x + 1;
+        while (end < x1 && line[end] == color) ++end;
+        prg32_gfx_rect_indexed(x, y, end - x, 1, v.cell[color]);
+        x = end;
+    }
+}
+
+static void draw_row(int y, int x0, int x1) {
     uint8_t *line = v.line;
     if (y >= HORIZON) {
         int r = y - HORIZON + 1;
@@ -561,14 +614,14 @@ static void draw_row(int y) {
         if (y >= s->y && y < s->y + s->h && (!v.hud || y >= HUD_H || s->h == 8)) blit_sprite_row(s, line, y);
     }
     draw_text_row(line, y);
-    v.row.pixels = line;
-    prg32_sprite_draw_indexed(0, y, &v.row, 0);
+    send_row(line, y, x0, x1);
 }
 
 static void mark_sprite(const spr_t *s) {
     int y0 = s->y < 0 ? 0 : s->y, y1 = s->y + s->h;
     if (y1 > PRG32_GAME_H) y1 = PRG32_GAME_H;
-    for (int y = y0; y < y1; ++y) v.dirty[y] = 1;
+    int lean = s->shear < 0 ? -s->shear : s->shear;
+    for (int y = y0; y < y1; ++y) mark_span(y, s->x - lean, s->x + s->w + lean);
 }
 
 static void render(void) {
@@ -589,12 +642,31 @@ static void render(void) {
     if (v.lower == LOWER_ROAD && (game.pos != v.road_pos_shown || game.x != v.road_x_shown)) {
         v.road_pos_shown = game.pos;
         v.road_x_shown = game.x;
-        for (int y = HORIZON; y < PRG32_GAME_H; ++y) v.dirty[y] = 1;
+        for (int r = 1; r <= TR_ROWS; ++r) {
+            int half = road_half(r), reach = half + road_kerb(half) + 1;
+            int left = v.center[r] - reach, right = v.center[r] + reach;
+            int y = HORIZON + r - 1;
+            if (v.ground_l[r] != v.shown_ground_l[r] || v.ground_r[r] != v.shown_ground_r[r]) v.dirty[y] = 1;
+            mark_span(y, left < v.shown_left[r] ? left : v.shown_left[r], right > v.shown_right[r] ? right : v.shown_right[r]);
+            v.shown_left[r] = (int16_t)left;
+            v.shown_right[r] = (int16_t)right;
+            v.shown_ground_l[r] = v.ground_l[r];
+            v.shown_ground_r[r] = v.ground_r[r];
+        }
     }
+    int sent = 0;
     for (int y = 0; y < PRG32_GAME_H; ++y) {
         if (v.dirty[y]) {
-            draw_row(y);
+            int whole = v.dirty[y] == 1;
+            draw_row(y, whole ? 0 : v.rx0[y], whole ? PRG32_GAME_W : v.rx1[y]);
             v.dirty[y] = 0;
+            sent = 1;
+        }
+        /* Two boxes, no more: on the board a present costs milliseconds before its
+         * first pixel, and 13 bands a frame measured 5 fps (docs/graphics.md). */
+        if (sent && y == HORIZON - 1) {
+            prg32_gfx_present();
+            sent = 0;
         }
     }
     for (int i = 0; i < v.count; ++i) v.prev[i] = v.cur[i];
@@ -1156,7 +1228,8 @@ static void update_step(uint32_t buttons, uint32_t pressed) {
  * host (the modal scoreboard, say) never fast-forwards the game. */
 void trerrote_update(void) {
     uint32_t buttons = prg32_input_read();
-    uint32_t pressed = buttons & ~v.last_input;
+    /* A press waits for the next tick: a frame shorter than a tick runs none. */
+    v.pending_pressed |= buttons & ~v.last_input;
     v.last_input = buttons;
     uint32_t now = prg32_ticks_ms();
     v.tick_accum += now - v.last_ms;
@@ -1164,8 +1237,9 @@ void trerrote_update(void) {
     if (v.tick_accum > TICK_MS * MAX_CATCH_UP) v.tick_accum = TICK_MS * MAX_CATCH_UP;
     while (v.tick_accum >= TICK_MS) {
         v.tick_accum -= TICK_MS;
+        uint32_t pressed = v.pending_pressed;
+        v.pending_pressed = 0;
         update_step(buttons, pressed);
-        pressed = 0;
     }
 }
 

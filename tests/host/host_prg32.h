@@ -89,6 +89,17 @@ void prg32_gfx_rect(int x, int y, int w, int h, uint16_t color) {
     host_dirty_add(x, y, w, h);
 }
 
+void prg32_gfx_rect_indexed(int x, int y, int w, int h, uint8_t index) {
+    ++host_abi_calls;
+    for (int py = y; py < y + h; ++py) {
+        if (py < 0 || py >= PRG32_GAME_H) continue;
+        for (int px = x; px < x + w; ++px) {
+            if (px >= 0 && px < PRG32_GAME_W) host_fb[py][px] = index;
+        }
+    }
+    host_dirty_add(x, y, w, h);
+}
+
 void prg32_gfx_present(void) {
     ++host_presents;
     if (host_dx1 < host_dx0) return;

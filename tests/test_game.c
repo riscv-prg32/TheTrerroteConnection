@@ -25,7 +25,7 @@ static long render_mismatch(void) {
     memcpy(before, host_panel, sizeof before);
     uint64_t spi = host_spi_pixels, presents = host_presents;
     uint32_t frame_pixels = host_frame_pixels;
-    for (int y = 0; y < PRG32_GAME_H; ++y) draw_row(y);
+    for (int y = 0; y < PRG32_GAME_H; ++y) draw_row(y, 0, PRG32_GAME_W);
     prg32_gfx_present();
     long diff = 0;
     for (int y = 0; y < PRG32_GAME_H; ++y)
@@ -36,9 +36,9 @@ static long render_mismatch(void) {
     return diff;
 }
 
-static void frame(uint32_t buttons) {
+static void frame_ms(uint32_t buttons, uint32_t ms) {
     host_input = buttons;
-    host_ms += 33;
+    host_ms += ms;
     host_frame_pixels = 0;
     trerrote_update();
     trerrote_draw();
@@ -58,6 +58,8 @@ static void frame(uint32_t buttons) {
         }
     }
 }
+
+static void frame(uint32_t buttons) { frame_ms(buttons, 33); }
 
 static void wait_frames(int n) {
     for (int i = 0; i < n; ++i) frame(0);
@@ -234,6 +236,48 @@ static void test_attract_and_timeout(void) {
     CHECK(v.app == APP_TRIBUTE);
 }
 
+/* A press that lands on a frame too short to run a tick must not be lost. */
+static void test_short_frames_keep_presses(void) {
+    trerrote_init();
+    wait_frames(3);
+    CHECK(v.app == APP_TRIBUTE);
+    v.tick_accum = 0;
+    frame_ms(PRG32_BTN_A, 2);
+    CHECK(v.app == APP_TRIBUTE);   /* no tick yet */
+    frame_ms(0, 2);
+    frame_ms(0, 33);
+    CHECK(v.app == APP_TITLE);
+    /* And one press acts once, however the frames fall. */
+    CHECK(v.pending_pressed == 0);
+    wait_frames(3);
+    CHECK(v.app == APP_TITLE);
+}
+
+/* Irregular frames, as on hardware, must not disturb the picture either. */
+static void test_irregular_frames(void) {
+    trerrote_init();
+    press(PRG32_BTN_A);
+    press(PRG32_BTN_A);
+    press(PRG32_BTN_A);
+    CHECK(v.app == APP_PLAY);
+    wait_frames(80);
+    static const uint8_t lengths[6] = {100, 7, 66, 41, 12, 108};
+    for (int i = 0; i < 600 && v.app == APP_PLAY; ++i) frame_ms(bot_buttons(), lengths[i % 6]);
+    CHECK(v.app == APP_PLAY);
+}
+
+/* Busy rows and plain rows take different paths to the firmware: same picture. */
+static void test_row_paths_agree(void) {
+    trerrote_init();
+    uint8_t line[VIEW_W + 8];
+    for (int k = 0; k < 2; ++k) {
+        for (int x = 0; x < PRG32_GAME_W; ++x)
+            line[x] = (uint8_t)(k ? (x / 40) % 8 : (x * 7) % PALETTE_SIZE);   /* few runs, many runs */
+        send_row(line, 50, 0, PRG32_GAME_W);
+        for (int x = 0; x < PRG32_GAME_W; ++x) CHECK(host_fb[50][x] == v.cell[line[x]]);
+    }
+}
+
 static void test_all_views_palette(void) {
     /* Every colour of a view must be exact on the indexed framebuffer. */
     for (int n = 0; n < VIEW_COUNT; ++n) {
@@ -277,6 +321,9 @@ int main(int argc, char **argv) {
     test_full_game();
     test_sound();
     test_attract_and_timeout();
+    test_short_frames_keep_presses();
+    test_irregular_frames();
+    test_row_paths_agree();
     printf("render: %lu frames, %lu repaint comparisons; in play %.0f panel pixels per frame on average, %llu at most\n",
            frames, sampled, game_frames ? (double)game_pixels / game_frames : 0.0, (unsigned long long)max_frame_pixels);
     printf("game: %d checks, %d failures; sizeof(v)=%zu sizeof(game)=%zu\n", checks, failures, sizeof v, sizeof game);

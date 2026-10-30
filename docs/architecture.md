@@ -18,8 +18,8 @@ The firmware calls `trerrote_update()`, `trerrote_draw()`, then presents.
 their speed on a slow host. Each step ticks the music, runs one screen's logic, and for play calls `tr_tick()`,
 then turns its events into sound.
 
-**Draw** rebuilds the sprite list from the game state, compares it with the last frame, marks the rows that
-changed, and redraws just those rows. See [graphics.md](graphics.md).
+**Draw** rebuilds the sprite list from the game state, compares it with the last frame, marks what
+changed, and resends just that. See [graphics.md](graphics.md).
 
 ## Why portable cartridges constrain the code
 

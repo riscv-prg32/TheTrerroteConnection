@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 (2026-10-30)
+
+From the first run on a physical ESP32-C6. A button press landing on a frame with no game tick is no longer lost.
+The frame rate in play rises from about 10 to about 17 fps: rows are sent as runs of colour, only the part of a row that
+changed is sent, sky and road are flushed separately, and the ground no longer alternates in bands. The sound
+has still not been heard, and the journey has not been completed on the board.
+
 ## 1.0.0 (2026-10-30)
 
 First release: a tribute to il Grande Maestro Tony Tammaro. Five legs from the Villa Comunale of Naples to Baia

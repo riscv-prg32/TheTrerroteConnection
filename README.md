@@ -57,9 +57,9 @@ In QEMU: `w a s d`, `j` for A, `k` for B, and Enter.
 
 ## Status
 
-Runs on the PRG32 firmware under QEMU and on the PRG32-QT core, and passes the Cartridge Store's own ingestion check. **It has not yet been run on a physical ESP32-C6, nor play-tested by people, and the soundtrack has been measured but not listened to by its composer.** See [docs/testing.md](docs/testing.md).
+Runs on a physical ESP32-C6, on the PRG32 firmware under QEMU and on the PRG32-QT core, and passes the Cartridge Store's own ingestion check. On the board it runs at about 17 frames per second in play. **It has not been played by people, the whole journey has not been driven on the board, and nobody has heard the soundtrack.** See [docs/testing.md](docs/testing.md).
 
-The Store bundle is `dist/the-trerrote-connection-1.0.0-store.zip`. It has not been submitted. See [docs/store_publishing.md](docs/store_publishing.md).
+The Store bundle is `dist/the-trerrote-connection-1.0.1-store.zip`. It has not been submitted. See [docs/store_publishing.md](docs/store_publishing.md).
 
 ## Build
 
