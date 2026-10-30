@@ -2,7 +2,8 @@
 """Run The Trerrote Connection in PRG32 QEMU with a scripted player.
 
 Saves framebuffer screenshots (PNG), the firmware audio stream (WAV) and,
-with --video, a 30-second MP4 preview of actual QEMU gameplay and audio:
+with --video, an MP4 preview of actual QEMU gameplay and audio (--seconds, 30 by
+default, which is what the Cartridge Store's media check requires):
 
   scripts/qemu_preview.py --script smoke --out build/qemu-smoke
   scripts/qemu_preview.py --script preview --video --out build/qemu-preview
@@ -89,6 +90,16 @@ SCRIPTS = {
         (10.5, "wait", None),
         (13.0, "shot", "store"),
         (4.0, "wait", None),
+    ],
+    # A minute of it, for watching rather than for the Store: the attract mode runs
+    # to its end and comes back round to the tribute.
+    "preview60": [
+        *BOOT,
+        (0.3, "rec", None),
+        (3.5, "key", "a"),
+        (10.5, "wait", None),
+        (25.0, "shot", "store60"),
+        (24.0, "wait", None),
     ],
 }
 
@@ -205,7 +216,8 @@ def main() -> int:
     ap.add_argument("--cart", type=Path, default=ROOT / "dist/the-trerrote-connection-qemu.prg32")
     ap.add_argument("--script", choices=sorted(SCRIPTS), default="smoke")
     ap.add_argument("--out", type=Path, default=ROOT / "build/qemu-smoke")
-    ap.add_argument("--video", action="store_true", help="record frames for a 30 s MP4")
+    ap.add_argument("--video", action="store_true", help="record frames for an MP4")
+    ap.add_argument("--seconds", type=float, default=30.0, help="length of the MP4")
     ap.add_argument("--fps", type=int, default=8)
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -261,8 +273,11 @@ def main() -> int:
             video_stop = threading.Event()
             audio_mark = [0]
 
+            rec_times = [0.0, 0.0]
+
             def recorder():
                 n = 0
+                rec_times[0] = time.monotonic()
                 period = 1.0 / args.fps
                 nxt = time.monotonic()
                 while not video_stop.is_set():
@@ -272,6 +287,7 @@ def main() -> int:
                     n += 1
                     nxt += period
                     time.sleep(max(0.0, nxt - time.monotonic()))
+                rec_times[1] = time.monotonic()
 
             def tap(name: str, seconds: float = 0.12):
                 end = time.monotonic() + seconds
@@ -329,13 +345,17 @@ def main() -> int:
             ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
             for k, f in enumerate(frames):        # crop the firmware status bands
                 Image.open(f).crop((0, 20, 320, 220)).resize((640, 400), Image.NEAREST).save(tmp / f"v{k:05d}.png")
-            seconds = len(frames) / args.fps
+            # The frame rate actually achieved: encoding at the requested one would
+            # slowly pull the picture away from the sound.
+            elapsed = rec_times[1] - rec_times[0]
+            fps = len(frames) / elapsed if elapsed > 0 else args.fps
+            seconds = len(frames) / fps
             mp4 = args.out / "preview.mp4"
-            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(args.fps),
+            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", f"{fps:.4f}",
                             "-i", str(tmp / "v%05d.png"), "-i", str(args.out / "audio.wav"),
-                            "-t", f"{min(30.0, seconds):.2f}", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            "-t", f"{min(args.seconds, seconds):.2f}", "-c:v", "libx264", "-pix_fmt", "yuv420p",
                             "-c:a", "aac", "-b:a", "96k", "-shortest", str(mp4)], check=True)
-            print(f"video {mp4} ({min(30.0, seconds):.1f} s, {len(frames)} frames)")
+            print(f"video {mp4} ({min(args.seconds, seconds):.1f} s, {len(frames)} frames at {fps:.2f} fps)")
         if b"loaded cartridge" not in transcript.lower() and b"cartridge" not in transcript.lower():
             print("warning: no cartridge load message in console.log", file=sys.stderr)
     return 0
