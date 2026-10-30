@@ -1,0 +1,5 @@
+journeys: 300 runs, 286 finished, 300 with all foods; mean food 5.00 delivered 16.3 stolen 6.1 left 1.5
+core: 12302945 checks, 0 failures
+sound: 21038 notes on 8 channels (engine 6161)
+render: 17897 frames, 5965 repaint comparisons; in play 44032 panel pixels per frame on average, 64000 at most
+game: 264510 checks, 0 failures; sizeof(v)=4664 sizeof(game)=452

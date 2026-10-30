@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "The Trerrote Connection"
+abstract: "A PRG32 tribute game to Tony Tammaro and an open teaching artifact for RV32IMC: a pseudo-3D road and row compositor on an 8-bit indexed framebuffer, in a 64 KiB cartridge, with an original eight-voice SID-like stereo soundtrack."
+type: software
+authors:
+  - family-names: Montella
+    given-names: Raffaele
+    affiliation: "University of Naples Parthenope"
+version: 1.0.0
+date-released: 2026-10-30
+license: MIT
+repository-code: "https://github.com/riscv-prg32/TheTrerroteConnection"
+keywords: [RISC-V, PRG32, education, game, indexed colour, pseudo-3D, SID]

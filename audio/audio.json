@@ -1,0 +1,186 @@
+{
+  "samples": [],
+  "instruments": [
+    {
+      "name": "bass",
+      "sample_id": 34464,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 64,
+      "sustain": 70,
+      "release": 22
+    },
+    {
+      "name": "organ_l",
+      "sample_id": 34646,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 50,
+      "sustain": 30,
+      "release": 22
+    },
+    {
+      "name": "organ_r",
+      "sample_id": 34666,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 50,
+      "sustain": 30,
+      "release": 22
+    },
+    {
+      "name": "lead_a",
+      "sample_id": 35790,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 2,
+      "decay": 72,
+      "sustain": 150,
+      "release": 30
+    },
+    {
+      "name": "lead_b",
+      "sample_id": 35798,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 2,
+      "decay": 72,
+      "sustain": 150,
+      "release": 30
+    },
+    {
+      "name": "lead_c",
+      "sample_id": 35806,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 2,
+      "decay": 72,
+      "sustain": 150,
+      "release": 30
+    },
+    {
+      "name": "mandolin",
+      "sample_id": 35794,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 36,
+      "sustain": 0,
+      "release": 12
+    },
+    {
+      "name": "kick",
+      "sample_id": 36003,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 40,
+      "sustain": 0,
+      "release": 10
+    },
+    {
+      "name": "snare",
+      "sample_id": 33635,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 28,
+      "sustain": 0,
+      "release": 10
+    },
+    {
+      "name": "echo",
+      "sample_id": 34594,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 3,
+      "decay": 56,
+      "sustain": 0,
+      "release": 24
+    },
+    {
+      "name": "pad",
+      "sample_id": 33632,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 22,
+      "decay": 70,
+      "sustain": 170,
+      "release": 70
+    },
+    {
+      "name": "engine",
+      "sample_id": 36302,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 26,
+      "sustain": 0,
+      "release": 6
+    },
+    {
+      "name": "sfx_horn",
+      "sample_id": 34786,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 80,
+      "sustain": 180,
+      "release": 12
+    },
+    {
+      "name": "sfx_thud",
+      "sample_id": 34979,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 44,
+      "sustain": 0,
+      "release": 12
+    },
+    {
+      "name": "sfx_crash",
+      "sample_id": 34403,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 76,
+      "sustain": 0,
+      "release": 30
+    },
+    {
+      "name": "sfx_chime",
+      "sample_id": 33760,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 62,
+      "sustain": 0,
+      "release": 40
+    },
+    {
+      "name": "sfx_zap",
+      "sample_id": 36641,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 0,
+      "decay": 34,
+      "sustain": 0,
+      "release": 12
+    },
+    {
+      "name": "sfx_boat",
+      "sample_id": 35233,
+      "default_volume": 255,
+      "default_pan": 0,
+      "attack": 12,
+      "decay": 110,
+      "sustain": 200,
+      "release": 60
+    }
+  ],
+  "tracks": []
+}

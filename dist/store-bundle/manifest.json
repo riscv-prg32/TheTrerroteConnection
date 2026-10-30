@@ -1,0 +1,102 @@
+{
+  "abi": "prg32-metadata-1.0",
+  "id": "org.riscv-prg32.the-trerrote-connection",
+  "title": "The Trerrote Connection",
+  "version": "1.0.0",
+  "summary": "An unofficial tribute game to il Grande Maestro Tony Tammaro: deliver watermelons by Ape Car from Naples to Baia Domizia.",
+  "description": "A tribute game for the myth of many generations, il Grande Maestro Tony Tammaro. Unofficial, made with affection by fans, and containing none of his music or lyrics. You drive a Trerrote, the three-wheeled Ape Car, from the Villa Comunale of Naples to the Molo Beverello in time for the ferry, through the lanes of Ischia with a load of 24 watermelons, then from Pozzuoli to Torregaveta, Mondragone and Baia Domizia. Dodge the potholes, the tamarri and the mozzarella truck. A melon that falls off keeps going: drive over it before a passer-by or another car takes it. Deliver to the stalls, and collect mozzariella, provola, ricotta, caciotta and a frittatina di maccheroni for Patrizia, who is waiting at the beach. A pseudo-3D road on a 64 KiB cartridge: 8-bit indexed colour, seven views painted after the real places, and an original eight-voice SID-like stereo soundtrack.",
+  "authors": [
+    {
+      "name": "Raffaele Montella",
+      "affiliation": "UniParthenope"
+    }
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/riscv-prg32/TheTrerroteConnection",
+  "repository": "https://github.com/riscv-prg32/TheTrerroteConnection",
+  "language": "it",
+  "tags": [
+    "game",
+    "racing",
+    "tribute",
+    "tony-tammaro",
+    "naples",
+    "riscv",
+    "indexed-color",
+    "pseudo-3d",
+    "sid-like",
+    "stereo"
+  ],
+  "created_at": "2026-10-30T00:00:00Z",
+  "updated_at": "2026-10-30T00:00:00Z",
+  "players": "1",
+  "colophon": {
+    "abi": "prg32-colophon-1.0",
+    "title": "The Trerrote Connection",
+    "subtitle": "Omaggio a Tony Tammaro",
+    "version": "1.0.0",
+    "release_date": "2026-10-30",
+    "developer": {
+      "name": "UniParthenope PRG32",
+      "url": "https://github.com/riscv-prg32/TheTrerroteConnection"
+    },
+    "authors": [
+      {
+        "role": "concept, project lead",
+        "name": "Raffaele Montella - UniParthenope"
+      },
+      {
+        "role": "game design, programming, pixel art, music, documentation",
+        "name": "Claude Code (Anthropic)"
+      }
+    ],
+    "license": "MIT",
+    "copyright": "Copyright 2026 PRG32",
+    "acknowledgements": [
+      "This is a tribute game for the myth of many generations: il Grande Maestro Tony Tammaro (https://www.tonytammaro.com).",
+      "It is unofficial: made by fans, not made, endorsed or reviewed by Tony Tammaro. Its use of his name, and of Patrizia and the Trerrote, is homage.",
+      "It contains none of his music, lyrics, recordings or images. The soundtrack is original, written for this game in the general style of Neapolitan cassette pop.",
+      "Every picture is painted from text sources in tools/, after the real places. No photograph is traced or sampled.",
+      "Every sound is the PRG32 SID-like synthesizer playing an original score. No samples, no recordings.",
+      "Tools and the sequencer are adapted from You Have Got Pizza: Deluxe Edition and Drumfight Napoli 97 (PRG32 family, MIT)."
+    ],
+    "content_notice": "Comic road mayhem. Nobody is ever run over: pedestrians jump clear, and they keep the melon.",
+    "controls": [
+      {
+        "input": "Joystick left / right",
+        "action": "Steer"
+      },
+      {
+        "input": "A",
+        "action": "Accelerate"
+      },
+      {
+        "input": "B or joystick down",
+        "action": "Brake"
+      },
+      {
+        "input": "Joystick up",
+        "action": "Horn"
+      },
+      {
+        "input": "START",
+        "action": "Pause (title: high scores)"
+      }
+    ],
+    "start_prompt": "Premi A"
+  },
+  "assets": {
+    "icon": "icon.png",
+    "splash": "splash.png"
+  },
+  "architectures": [
+    {
+      "id": "esp32c6",
+      "file": "the-trerrote-connection-esp32c6.prg32"
+    },
+    {
+      "id": "qemu",
+      "file": "the-trerrote-connection-qemu.prg32"
+    }
+  ]
+}
