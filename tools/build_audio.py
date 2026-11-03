@@ -288,36 +288,58 @@ class Encoder:
 
 # ---- accompaniment, derived from the chart by fixed rules --------------------------
 
-def bass_pattern() -> list[int]:
-    """The oom: root on beat 1, fifth on beat 3, a pickup into the next bar."""
-    a, e = midi("A2"), midi("E3")
+def bass_pattern(variant: int, approach: int) -> list[int]:
+    """Written on A, transposed with the chord. Variant 0 is the oom: root on beat 1,
+    fifth on beat 3. Variant 1 walks: root, third, fifth, sixth. Both end on a
+    chromatic step into the next bar's root, `approach` semitones from this one."""
+    a = midi("A2")
     p = [HOLD] * STEPS
-    p[0], p[3], p[8], p[11], p[14] = a, OFF, e, OFF, midi("G3")
+    if variant == 0:
+        p[0], p[3], p[8], p[11] = a, OFF, a + 7, OFF
+    else:
+        p[0], p[4], p[8], p[11] = a, a + 3, a + 7, a + 9
+    target = a + approach
+    while target - a > 6:
+        target -= 12
+    while target - a < -6:
+        target += 12
+    p[14] = target - 1 if target > a else target + 1
     return p
 
 
-def pah_pattern(tone: int) -> list[int]:
-    """The pah: an organ stab on every off-beat. Written on A, transposed."""
+def pah_pattern(tone: int, held: bool) -> list[int]:
+    """The pah: an organ stab on every off-beat; or, for contrast, a chord held on
+    beats 1 and 3. Written on A, transposed."""
     n = midi("A3") + tone
     p = [HOLD] * STEPS
-    for k in (2, 6, 10, 14):
-        p[k], p[k + 1] = n, OFF
+    if held:
+        p[0], p[7], p[8], p[15] = n, OFF, n, OFF
+    else:
+        for k in (2, 6, 10, 14):
+            p[k], p[k + 1] = n, OFF
     return p
 
 
-def arp_pattern(tones: tuple[int, ...]) -> list[int]:
-    """Mandolin figure, sixteenths up and down the chord."""
+def arp_pattern(tones: tuple[int, ...], down: bool) -> list[int]:
+    """Mandolin figure, sixteenths up the chord, or down it."""
     a = midi("A4")
     t = list(tones)[:3]
-    seq = [t[0], t[1], t[2], t[0] + 12] * 4
-    return [a + v for v in seq]
+    seq = [t[0], t[1], t[2], t[0] + 12] if not down else [t[0] + 12, t[2], t[1], t[0]]
+    return [a + v for v in seq * 4]
 
 
-def drum_pattern() -> list[int]:
-    """The boom-chick of a drum machine bought at the local music shop in 1986."""
-    kick, snare = 40, 74
-    hat = 88
-    return [kick, HOLD, hat, HOLD, snare, HOLD, hat, kick, kick, HOLD, hat, HOLD, snare, HOLD, hat, hat]
+KICK, SNARE, HAT, CRASH = 40, 74, 88, 96
+
+
+def drum_pattern(kind: int) -> list[int]:
+    """The boom-chick of a drum machine bought at the local music shop in 1986.
+    Kind 0 is the groove, 1 ends a phrase with a fill, 2 opens one with a crash."""
+    p = [KICK, HOLD, HAT, HOLD, SNARE, HOLD, HAT, KICK, KICK, HOLD, HAT, HOLD, SNARE, HOLD, HAT, HAT]
+    if kind == 1:
+        p[10:] = [SNARE, HOLD, SNARE, SNARE, SNARE, SNARE]
+    elif kind == 2:
+        p[0] = CRASH
+    return p
 
 
 def transpose_for(root: int) -> int:
@@ -329,23 +351,29 @@ def encode_song(enc: Encoder, song: dict, voices: list[str]) -> dict:
     orders: dict[str, list[tuple[int, int]]] = {v: [] for v in voices}
     leads = [melody(line, song.get("tremolo", False)) for line in song["lead"]]
     plain = [melody(line) for line in song["lead"]]
+    bars = len(song["chart"])
     for bar, chart in enumerate(song["chart"]):
         root, quality = CHORDS[chart]
         t = transpose_for(root)
         tones = TONES[quality]
+        nxt = CHORDS[song["chart"][(bar + 1) % bars]][0]
+        # Sections: the second half answers the first with a different accompaniment.
+        second = bars >= 8 and bar >= bars // 2
+        phrase_end = bar % 4 == 3
         for v in voices:
             if v == "bass":
-                orders[v].append((enc.add(bass_pattern()), t))
+                orders[v].append((enc.add(bass_pattern(1 if second else 0, (nxt - root) % 12)), t))
             elif v == "organ_l":
-                orders[v].append((enc.add(pah_pattern(tones[1])), t))
+                orders[v].append((enc.add(pah_pattern(tones[1], second and not phrase_end)), t))
             elif v == "organ_r":
-                orders[v].append((enc.add(pah_pattern(tones[2])), t))
+                orders[v].append((enc.add(pah_pattern(tones[2], second and not phrase_end)), t))
             elif v == "lead":
                 orders[v].append((enc.add(leads[bar]), 0))
             elif v == "arp":
-                orders[v].append((enc.add(arp_pattern(tones)), t))
+                orders[v].append((enc.add(arp_pattern(tones, second)), t))
             elif v == "perc":
-                orders[v].append((enc.add(drum_pattern()), 0))
+                kind = 1 if phrase_end and bars >= 4 else 2 if bar % 8 == 0 and bars >= 8 else 0
+                orders[v].append((enc.add(drum_pattern(kind)), 0))
             elif v == "echo":
                 prev = plain[bar - 1] if bar else [HOLD] * STEPS
                 delayed = prev[-3:] + plain[bar][:-3]
@@ -384,6 +412,10 @@ SFX = {
     "food": [("sfx_chime", 79, 1), ("sfx_chime", 83, 1), ("sfx_chime", 86, 1), ("sfx_chime", 91, 3)],
     "ferry": [("sfx_boat", 43, 22), ("sfx_boat", 43, 3)],
     "tick": [("sfx_chime", 91, 1)],
+    # One melon sold: the till's bell and the drawer.
+    "sold": [("sfx_chime", 84, 1), ("sfx_chime", 91, 2), ("sfx_thud", 52, 1)],
+    # Driven past a stall: the mellonaro's disappointed "eh!".
+    "missed": [("sfx_horn", 67, 3), ("sfx_horn", 63, 5)],
     "menu": [("sfx_chime", 79, 1)],
 }
 

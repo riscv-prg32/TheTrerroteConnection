@@ -24,6 +24,10 @@
 #define TR_MELONS_FULL 24
 #define TR_DELIVERY 4          /* melons handed over at each stall */
 #define TR_FOODS 5
+#define TR_STALL_BEFORE 6      /* the stall's bay: segments before it ... */
+#define TR_STALL_AFTER 3       /* ... and after it */
+#define TR_STOP_SPEED 12       /* Q8 segments per tick: stopped, as far as a mellonaro cares */
+#define TR_HAND_TICKS 8        /* one melon handed over every 8 ticks */
 
 #define TR_MAX_CARS 8
 #define TR_MAX_LOOSE 8
@@ -38,22 +42,24 @@
 #define TR_IN_HORN 16u
 
 enum { GROUND_PAVE, GROUND_SEA, GROUND_SAND, GROUND_GRASS, GROUND_TUFF };
-enum { DECO_NONE, DECO_PALM, DECO_PINE, DECO_LAMP, DECO_HOUSE, DECO_UMBRELLA };
+enum { DECO_NONE, DECO_PALM, DECO_PINE, DECO_LAMP, DECO_HOUSE, DECO_UMBRELLA, DECO_SHRINE, DECO_BINS, DECO_WASHING,
+       DECO_PARKED };
+enum { SURFACE_ASPHALT, SURFACE_BASOLI, SURFACE_WORN };
 enum { ANCHOR_STALL, ANCHOR_FOOD };
 enum { STYLE_JAM, STYLE_LANES, STYLE_TAMARRI, STYLE_TRUCK, STYLE_EVERYTHING };
-enum { CAR_NONE, CAR_PLAIN, CAR_TAMARRO, CAR_SCOOTER, CAR_TRUCK };
+enum { CAR_NONE, CAR_PLAIN, CAR_TAMARRO, CAR_SCOOTER, CAR_TRUCK, CAR_PARKED };
 enum { PH_READY, PH_PLAY, PH_ARRIVE, PH_DONE, PH_TIMEUP, PH_NOMELONS };
 enum { MELON_FREE, MELON_FLYING, MELON_ROLLING, MELON_REST };
 enum { THIEF_FREE, THIEF_COMING, THIEF_LEAVING, THIEF_FLEEING };
 enum {
     EV_NONE, EV_BUMP, EV_CRASH, EV_SCRAPE, EV_SPILL, EV_RECOVER, EV_STOLEN, EV_DELIVER, EV_FOOD,
-    EV_HORN, EV_GO, EV_ARRIVE, EV_TIME_LOW, EV_COUNT
+    EV_HORN, EV_GO, EV_ARRIVE, EV_TIME_LOW, EV_MISSED, EV_COUNT
 };
 
 typedef struct {
     uint16_t len;
     int8_t curve;
-    uint8_t width, ground_l, ground_r, deco_l, deco_r, period, traffic, holes;
+    uint8_t width, ground_l, ground_r, deco_l, deco_r, period, traffic, holes, surface, parked;
 } tr_section_t;
 
 typedef struct {
@@ -87,6 +93,8 @@ typedef struct {
     uint8_t sec_count, sec_first;
     uint8_t anchor_first, anchor_count;
     uint16_t anchor_taken;
+    int8_t stall_now;              /* the stall being served, or -1 */
+    uint8_t stall_given, stall_timer;
 
     int32_t pos;                   /* the camera's distance along the road, Q8 */
     int16_t x, spd;
@@ -147,6 +155,8 @@ static tr_section_t tr_section_read(int absolute_index) {
     s.period = d[8];
     s.traffic = d[9];
     s.holes = d[10];
+    s.surface = d[11];
+    s.parked = d[12];
     return s;
 }
 
@@ -186,6 +196,9 @@ static void tr_load_level(tr_game_t *g, int level) {
     g->anchor_first = (uint8_t)row[2];
     g->anchor_count = (uint8_t)row[3];
     g->anchor_taken = 0;
+    g->stall_now = -1;
+    g->stall_given = 0;
+    g->stall_timer = 0;
     g->length = row[4];
     g->time_limit = (uint32_t)row[5] * TR_TICKS_PER_SEC;
     g->style = (uint8_t)row[10];
@@ -335,7 +348,7 @@ static void tr_loose_update(tr_game_t *g) {
         /* Any car that reaches it keeps it. */
         for (int c = 0; c < TR_MAX_CARS; ++c) {
             const tr_car_t *car = &g->cars[c];
-            if (car->kind != CAR_NONE && m->h < 80 && tr_abs(car->z - m->z) < 200 && tr_abs(car->x - m->x) < 60) {
+            if (car->kind != CAR_NONE && car->kind != CAR_PARKED && m->h < 80 && tr_abs(car->z - m->z) < 200 && tr_abs(car->x - m->x) < 60) {
                 m->state = MELON_FREE;
                 g->stolen++;
                 tr_event(g, EV_STOLEN, m->x, g->stolen);
@@ -398,7 +411,7 @@ static void tr_thieves_update(tr_game_t *g) {
 /* ---- traffic ------------------------------------------------------------------ */
 
 static int tr_car_half(int kind) {
-    return kind == CAR_TRUCK ? 80 : kind == CAR_SCOOTER ? 26 : 56;
+    return kind == CAR_TRUCK ? 80 : kind == CAR_SCOOTER ? 26 : 56;   /* CAR_PARKED too */
 }
 
 static tr_car_t *tr_car_slot(tr_game_t *g) {
@@ -438,6 +451,11 @@ static void tr_spawn_traffic(tr_game_t *g) {
     uint32_t seg = (uint32_t)(g->pos >> 8) + 60;
     if (seg + 30 >= g->length) return;
     tr_section_t s = tr_section_at(g, seg);
+    /* Double parking, la doppia fila: a car left in the lane with its hazards on. */
+    if (s.parked && (tr_rand(g) & 15u) < s.parked) {
+        int side = (tr_rand(g) & 1u) ? 1 : -1;
+        tr_spawn_one(g, CAR_PARKED, (int)(seg + 4) << 8, side * (tr_edge(s.width) - 64), 0);
+    }
     g->spawn_timer = (uint16_t)(s.traffic ? (g->style == STYLE_JAM ? 16 + 120 / (s.traffic + 1) : 34 + 260 / (s.traffic + 1)) + (tr_rand(g) & 15u) : 40);
     if (!s.traffic) return;
     int z = (int)seg << 8;
@@ -490,11 +508,23 @@ static void tr_traffic_update(tr_game_t *g) {
             const tr_car_t *o = &g->cars[k];
             if (k == i || o->kind == CAR_NONE) continue;
             int dz = o->z - c->z;
+            if (o->kind == CAR_PARKED && c->kind != CAR_PARKED) {
+                /* Round the double-parked car, waiting only when nose to tail. */
+                if (dz > 0 && dz < 8 * 256 && tr_abs(o->x - c->x) < 100) {
+                    c->target_x = (int16_t)(o->x > 0 ? o->x - 150 : o->x + 150);
+                    if (dz < 2 * 256 && tr_abs(o->x - c->x) < 90) spd = 0;
+                }
+                continue;
+            }
             if (dz > 0 && dz < 5 * 256 && tr_abs(o->x - c->x) < 90 && o->spd < spd) spd = o->spd;
         }
         c->z += spd;
         tr_section_t s = tr_section_at(g, (uint32_t)(c->z >> 8));
         int lane = 128 * s.width / 16;
+        if (c->kind == CAR_PARKED) {
+            if (c->z < g->pos - 512) c->kind = CAR_NONE;
+            continue;
+        }
         if (c->kind == CAR_SCOOTER) {
             /* A scooter weaves because it can. */
             if ((c->anim & 63u) == 0) c->target_x = (int16_t)((int)(tr_rand(g) & 255u) * 2 * lane / 255 - lane);
@@ -536,6 +566,16 @@ static void tr_collide_cars(tr_game_t *g) {
         int ahead = c->z > player_z;
         if (ahead && before <= c->spd) continue;
         int loss = c->kind == CAR_TRUCK ? 3 : 1;
+        if (c->kind == CAR_PARKED) {
+            /* Into the back of it: the Ape stops dead, the parked car does not move. */
+            g->spd = 0;
+            g->bump = 12;
+            g->hit_cooldown = 30;
+            g->x = (int16_t)(c->x > 0 ? c->x - reach - 4 : c->x + reach + 4);
+            tr_event(g, EV_CRASH, g->x, (unsigned)c->kind);
+            tr_spill(g, loss, before, c->x > 0 ? -1 : 1);
+            return;
+        }
         g->spd = (int16_t)(ahead ? c->spd * 3 / 4 : before);
         if (c->kind == CAR_TRUCK && ahead) g->spd = (int16_t)(c->spd / 3);
         g->bump = 12;
@@ -567,23 +607,62 @@ static void tr_cross_segment(tr_game_t *g, uint32_t seg) {
         const uint8_t *a = anchor_data + (g->anchor_first + i) * 4;
         if ((uint32_t)(a[1] | (a[2] << 8)) != seg) continue;
         int where = (int8_t)a[3];
-        if (a[0] == ANCHOR_STALL) {
-            /* The stall's bay is on its own half of the road. */
-            if (where * g->x > 30 && g->melons) {
-                int n = g->melons < TR_DELIVERY ? g->melons : TR_DELIVERY;
-                g->melons = (uint8_t)(g->melons - n);
-                g->delivered = (uint8_t)(g->delivered + n);
-                tr_score(g, (unsigned)n * 250u);
-                g->anchor_taken |= (uint16_t)(1u << i);
-                tr_event(g, EV_DELIVER, g->x, (unsigned)n);
-            }
-        } else if (g->food_next < TR_FOODS && tr_abs(where - g->x) < 90) {
+        if (a[0] == ANCHOR_STALL) continue;     /* stalls want you to stop: tr_stalls_update */
+        if (g->food_next < TR_FOODS && tr_abs(where - g->x) < 90) {
             tr_event(g, EV_FOOD, g->x, g->food_next);
             g->food_next++;
             tr_score(g, 300);
             g->anchor_taken |= (uint16_t)(1u << i);
         }
     }
+}
+
+/* A mellonaro buys only from an Ape that stops at his stall, on his side of the
+ * road, and takes one melon at a time. Drive past and the sale is lost. */
+static void tr_stalls_update(tr_game_t *g) {
+    int seg = (int)((g->pos + TR_PLAYER_Z) >> 8);
+    for (int i = 0; i < g->anchor_count; ++i) {
+        if ((g->anchor_taken >> i) & 1u) continue;
+        const uint8_t *a = anchor_data + (g->anchor_first + i) * 4;
+        if (a[0] != ANCHOR_STALL) continue;
+        int aseg = a[1] | (a[2] << 8), where = (int8_t)a[3];
+        if (seg > aseg + TR_STALL_AFTER) {
+            g->anchor_taken |= (uint16_t)(1u << i);
+            if (g->stall_now == i) g->stall_now = -1;
+            else if (g->melons) tr_event(g, EV_MISSED, g->x, (unsigned)i);
+            continue;
+        }
+        if (seg + TR_STALL_BEFORE < aseg || where * g->x <= 30 || g->spd > TR_STOP_SPEED || !g->melons) continue;
+        if (g->stall_now != i) {
+            g->stall_now = (int8_t)i;
+            g->stall_given = 0;
+            g->stall_timer = 0;
+        }
+        if (++g->stall_timer < TR_HAND_TICKS) continue;
+        g->stall_timer = 0;
+        g->melons--;
+        g->delivered++;
+        g->stall_given++;
+        tr_score(g, 250);
+        tr_event(g, EV_DELIVER, g->x, g->stall_given);
+        if (g->stall_given >= TR_DELIVERY || !g->melons) {
+            g->anchor_taken |= (uint16_t)(1u << i);
+            g->stall_now = -1;
+        }
+    }
+}
+
+/* The stall ahead that still wants melons, or -1. */
+static int tr_next_stall(const tr_game_t *g, int *distance) {
+    int seg = (int)((g->pos + TR_PLAYER_Z) >> 8);
+    for (int i = 0; i < g->anchor_count; ++i) {
+        if ((g->anchor_taken >> i) & 1u) continue;
+        const uint8_t *a = anchor_data + (g->anchor_first + i) * 4;
+        if (a[0] != ANCHOR_STALL) continue;
+        *distance = (a[1] | (a[2] << 8)) - seg;
+        return i;
+    }
+    return -1;
 }
 
 static int tr_melons_alive(const tr_game_t *g) {
@@ -711,7 +790,7 @@ static void tr_tick(tr_game_t *g, uint32_t input) {
         }
         for (int i = 0; i < TR_MAX_CARS; ++i) {
             tr_car_t *c = &g->cars[i];
-            if (c->kind == CAR_NONE || c->kind == CAR_TRUCK) continue;
+            if (c->kind == CAR_NONE || c->kind == CAR_TRUCK || c->kind == CAR_PARKED) continue;
             int dz = c->z - (g->pos + TR_PLAYER_Z);
             if (dz > 0 && dz < 16 * 256 && tr_abs(c->x - g->x) < 110) {
                 int lane = 128 * s.width / 16;
@@ -732,6 +811,7 @@ static void tr_tick(tr_game_t *g, uint32_t input) {
     tr_collide_cars(g);
     tr_loose_update(g);
     tr_thieves_update(g);
+    tr_stalls_update(g);
 
     if (now >= g->length) {
         uint32_t left_s = left / TR_TICKS_PER_SEC;
@@ -782,7 +862,7 @@ static uint32_t tr_bot_input(const tr_game_t *g) {
             int d = aseg - (int)seg;
             if (d < 1 || d > 30) continue;
             if (a[0] == ANCHOR_STALL) {
-                if (where * x > 40 && g->melons) cost -= 300;
+                if (where * x > 40 && g->melons) cost -= 600;
             } else if (g->food_next < TR_FOODS && tr_abs(where - x) < 60) {
                 cost -= 300;
             }
@@ -803,9 +883,28 @@ static uint32_t tr_bot_input(const tr_game_t *g) {
         const tr_car_t *c = &g->cars[i];
         if (c->kind == CAR_NONE) continue;
         int dz = c->z - player_z;
+        /* A parked car is passed, not followed: brake only if the way round is not yet clear. */
+        if (c->kind == CAR_PARKED && tr_abs(c->x - target) >= tr_car_half(c->kind) + 50) {
+            if (tr_abs(c->x - g->x) < tr_car_half(c->kind) + 44 && dz > 0 && dz < 3 * 256 && g->spd > 40)
+                in = (in & ~TR_IN_GAS) | TR_IN_BRAKE;
+            continue;
+        }
         if (dz > 0 && dz < 7 * 256 && tr_abs(c->x - g->x) < tr_car_half(c->kind) + 50 && g->spd > c->spd) {
             in = (in & ~TR_IN_GAS) | TR_IN_BRAKE;
             if (!g->horn_cooldown) in |= TR_IN_HORN;   /* the Neapolitan indicator */
+        }
+    }
+    /* A stall ahead: be on its side early, then brake into its bay and wait. */
+    int d = 0, stall = g->melons ? tr_next_stall(g, &d) : -1;
+    if (stall >= 0 && d <= 40) {
+        const uint8_t *a = anchor_data + (g->anchor_first + stall) * 4;
+        int side = (int8_t)a[3] * g->x > 30;
+        int stop = (g->spd * g->spd) / (2 * 6 * 256) + 2;
+        if (side && (d - 1 <= stop || (d <= 0 && g->spd <= TR_STOP_SPEED + 6))) in = (in & ~TR_IN_GAS) | TR_IN_BRAKE;
+        else if (!side && d <= 4) {
+            /* Short of the side: creep over, slowly. */
+            in &= ~TR_IN_BRAKE;
+            if (g->spd > 30) in = (in & ~TR_IN_GAS) | TR_IN_BRAKE;
         }
     }
     /* Thieves on their way to a melon get the horn too. */

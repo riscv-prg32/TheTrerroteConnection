@@ -19,8 +19,8 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 prg32_repo="$(cd "${PRG32_REPO:-"$repo_dir/../PRG32"}" && pwd)"
 name="the-trerrote-connection"
-cart_ram_kib=64          # the default firmware profile on ESP32-C6 and QEMU
-package_limit=65536      # one cartridge slot: code + audio + Store trailer
+cart_ram_kib=128         # PRG32's large profile, the default on ESP32-C6 and QEMU
+package_limit=131072     # one 128 KiB cartridge slot: code + audio + Store trailer
 
 if ! command -v riscv32-esp-elf-gcc >/dev/null 2>&1; then
   # The toolchain alone is enough; prefer it to the whole ESP-IDF environment.

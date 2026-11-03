@@ -27,7 +27,7 @@ import levels as lv  # noqa: E402
 import palette as pal  # noqa: E402
 
 FONT_ORDER = list(" ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:!?.,-+/'")
-TRANSPARENT = pal.FIXED_INDEX["tuff"]   # no sprite uses the tuff colour
+TRANSPARENT = pal.FIXED_INDEX["clear"]   # the last sprite slot: never drawn
 
 
 # ---- reducing a painting to the firmware's cube --------------------------------
@@ -36,7 +36,7 @@ def _to565(rgb) -> int:
     return ((rgb[0] >> 3) << 11) | ((rgb[1] >> 2) << 5) | (rgb[2] >> 3)
 
 
-def reduce_view(img: Image.Image, count: int = pal.VIEW_COLORS):
+def reduce_view(img: Image.Image, count: int = pal.VIEW_COLORS, dither: bool = False):
     """Choose `count` colours that each own one cube cell, and map the picture.
 
     Pixels are first grouped by the cell they fall in, so every group's mean is
@@ -98,14 +98,57 @@ def reduce_view(img: Image.Image, count: int = pal.VIEW_COLORS):
     index = {cell: i for i, cell in enumerate(live)}
     colors = [color(c) for c in live]
     pixels = [[index[final(cell_of[y][x])] for x in range(w)] for y in range(h)]
+    if dither:
+        _dither(px, pixels, colors)
     while len(colors) < count:
         colors.append(colors[0])
     assert pal.check(pal.FIXED_RGB565 + colors) == 0
     return colors, pixels
 
 
-def encode_rows(rows: list[list[int]]) -> tuple[list[int], list[int]]:
-    """(index << 3) | run, run 1..7; run 0 means the next byte holds a longer run.
+BAYER = ((0.2, 0.6), (0.8, 0.4))
+
+
+def _dither(px, pixels, colors) -> None:
+    """Ordered 2 x 2 dither between two neighbouring colours, only where the painted
+    tone lies well between them: a cube cell holds one colour, so a gentle slope of
+    tone would otherwise collapse into one flat patch. Flat areas stay flat, and
+    edges between unlike colours are left alone."""
+    rgb = [pal.rgb888(c) for c in colors]
+    n = len(rgb)
+    h, w = len(pixels), len(pixels[0])
+    for y in range(h):
+        for x in range(w):
+            o = px[x, y]
+            # Only inside a smooth area: next to an edge the mid-tones are anti-aliasing.
+            if any(max(abs(o[k] - q[k]) for k in range(3)) > 10
+                   for q in (px[max(x - 1, 0), y], px[min(x + 1, w - 1), y], px[x, max(y - 1, 0)], px[x, min(y + 1, h - 1)],
+                             px[max(x - 2, 0), y], px[min(x + 2, w - 1), y])):
+                continue
+            a = pixels[y][x]
+            ca = rgb[a]
+            best = None
+            for b in range(n):
+                if b == a:
+                    continue
+                cb = rgb[b]
+                d = [cb[k] - ca[k] for k in range(3)]
+                span = d[0] * d[0] + d[1] * d[1] + d[2] * d[2]
+                if span == 0 or span > 70 * 70:
+                    continue
+                t = sum((o[k] - ca[k]) * d[k] for k in range(3)) / span
+                if not 0.3 <= t <= 0.7:
+                    continue
+                miss = sum((o[k] - ca[k] - t * d[k]) ** 2 for k in range(3))
+                if miss < span * 0.05 and (best is None or miss < best[0]):
+                    best = (miss, b, t)
+            if best and best[2] > BAYER[y & 1][x & 1]:
+                pixels[y][x] = best[1]
+
+
+def encode_rows(rows: list[list[int]], bits: int = 5) -> tuple[list[int], list[int]]:
+    """(index << (8 - bits)) | run, run 1..2^(8-bits)-1; run 0 means the next byte holds a
+    longer run. Sprites use 5 bits of colour, views 6.
 
     Identical rows share one encoding: skies are mostly flat bands.
     """
@@ -124,10 +167,12 @@ def encode_rows(rows: list[list[int]]) -> tuple[list[int], list[int]]:
             run = 1
             while x + run < len(row) and row[x + run] == row[x] and run < 255:
                 run += 1
-            if run < 8:
-                data.append((row[x] << 3) | run)
+            shift = 8 - bits
+            assert row[x] < (1 << bits)
+            if run < (1 << shift):
+                data.append((row[x] << shift) | run)
             else:
-                data += [row[x] << 3, run]
+                data += [row[x] << shift, run]
             x += run
     return offsets, data
 
@@ -168,7 +213,7 @@ def main() -> int:
     sheet = Image.new("RGB", (sc.W, (sc.H + 2) * len(sc.VIEWS)))
     for n, (name, _, painter) in enumerate(sc.VIEWS):
         colors, pixels = reduce_view(painter())
-        offsets, data = encode_rows(pixels)
+        offsets, data = encode_rows(pixels, 6)
         view_pal += colors
         view_rows += [len(view_data) + o for o in offsets]
         view_data += data
@@ -177,9 +222,8 @@ def main() -> int:
             for x in range(sc.W):
                 sheet.putpixel((x, n * (sc.H + 2) + y), pal.rgb888(colors[pixels[y][x]]))
     sheet.resize((sheet.width * 2, sheet.height * 2), Image.NEAREST).save(png / "views.png")
-    assert len(view_data) < 65536
     out.append(array("uint16_t", "view_palette", view_pal))
-    out.append(array("uint16_t", "view_rows", view_rows))
+    out.append(array("uint32_t", "view_rows", view_rows))
     out.append(array("uint8_t", "view_data", view_data))
 
     # Sprites.
@@ -191,7 +235,7 @@ def main() -> int:
         g = make()
         for row in g.p:
             for c in row:
-                assert c != "tuff" and (c is None or c in pal.FIXED_INDEX), (name, c)
+                assert c is None or (c in pal.FIXED_INDEX and pal.FIXED_INDEX[c] < TRANSPARENT), (name, c)
         rows = [[pal.FIXED_INDEX[c] if c else TRANSPARENT for c in row] for row in g.p]
         offsets, data = encode_rows(rows)
         spr_w.append(g.w)
@@ -210,8 +254,8 @@ def main() -> int:
     print(f"sprites: {len(sp.SPRITES)}, {len(spr_data)} + {2 * len(spr_rows)} bytes")
 
     # Sprite sheet preview.
-    cols, x, y, rowh = 320, 2, 2, 0
-    prev = Image.new("RGB", (cols, 240), (70, 80, 90))
+    cols, x, y, rowh = 400, 2, 2, 0
+    prev = Image.new("RGB", (cols, 1000), (70, 80, 90))
     for g in tiles:
         if x + g.w + 2 > cols:
             x, y, rowh = 2, y + rowh + 2, 0
@@ -221,7 +265,8 @@ def main() -> int:
                     prev.putpixel((x + px_, y + py), rgb_of_fixed(c))
         x += g.w + 2
         rowh = max(rowh, g.h)
-    prev.resize((cols * 3, 720), Image.NEAREST).save(png / "sprites.png")
+    prev = prev.crop((0, 0, cols, y + rowh + 2))
+    prev.resize((cols * 2, prev.height * 2), Image.NEAREST).save(png / "sprites.png")
 
     # Font.
     glyphs: list[int] = []
@@ -247,7 +292,7 @@ def main() -> int:
     for level in lv.LEVELS:
         first = len(sec_bytes) // lv_SECTION
         for s in level["sections"]:
-            sec_bytes += [s[0] & 255, s[0] >> 8, s[1] & 255, s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9]]
+            sec_bytes += [s[0] & 255, s[0] >> 8, s[1] & 255, s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9], s[10], s[11]]
         first_anchor = len(anchors) // 4
         for kind, seg, where in level["anchors"]:
             anchors += [kind, seg & 255, seg >> 8, where & 255]
@@ -272,7 +317,7 @@ def main() -> int:
     return 0
 
 
-lv_SECTION = 11
+lv_SECTION = 13
 
 if __name__ == "__main__":
     raise SystemExit(main())

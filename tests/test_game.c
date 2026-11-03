@@ -300,7 +300,7 @@ static void test_all_views_palette(void) {
     for (int n = 0; n < VIEW_COUNT; ++n) {
         for (int row = 0; row < VIEW_H; ++row) {
             memset(v.line, 255, sizeof v.line);
-            decode_row(view_data + view_rows[n * VIEW_H + row], v.line, VIEW_W, FIXED_COUNT);
+            decode_view_row(view_data + view_rows[n * VIEW_H + row], v.line, VIEW_W, FIXED_COUNT);
             for (int x = 0; x < VIEW_W; ++x) CHECK(v.line[x] >= FIXED_COUNT && v.line[x] < PALETTE_SIZE);
             CHECK(v.line[VIEW_W] == 255);
         }

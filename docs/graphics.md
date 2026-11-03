@@ -13,21 +13,24 @@ prg32_palette_set(q(C), C);
 makes that cell show exactly C. The one condition is that **two different colours on screen at once must not share
 a cell**. QEMU keeps a direct-colour surface, which shows the value as it is, so both displays get the same picture.
 
-Each screen has up to 64 colours: 32 fixed for road, ground, sprites and interface, and 32 for its view.
+Each screen has up to 112 colours: 48 fixed (32 for sprites and interface, 16 for road and ground) and 64 for its
+view. The fixed colours are tuned so each has a cell of its own; a few share a value on purpose (the road's grey is
+also a sprite's dark grey), which the rule allows.
 
 **Choosing the view's colours.** A first attempt quantised each painting by median cut, then moved colours to free
 cells. Hues shifted badly: skies went pink. `reduce_view()` in `tools/build_art.py` starts from the cube instead:
 
 1. Group pixels by the cell they fall in; each group's mean is an exact colour of that cell.
 2. A group in a cell held by a fixed colour becomes that colour.
-3. Merge the cheapest group into its nearest neighbour until 32 remain.
+3. Merge the cheapest group into its nearest neighbour until 64 remain.
 
 No colour ever crosses a cell, so no hue changes.
 
 ## 2. Pictures as rows
 
-Views are 368 x 80 (320 plus 24 each side for parallax), sprites up to 96 wide. Both use one code:
-`(index << 3) | run`, with run 0 meaning the next byte holds the length. Each row can be decoded on its own, in any
+Views are 368 x 80 (320 plus 24 each side for parallax), sprites up to 160 wide. Sprites use `(index << 3) | run`
+(32 colours, index 31 transparent), views `(index << 2) | run` (64 colours); in both, run 0 means the next byte holds
+the length. Each row can be decoded on its own, in any
 order, through a table of offsets, and identical rows share one encoding. There's no compression across rows, because
 random access is the point: a row can be restored with no copy of the picture in memory.
 
@@ -35,7 +38,10 @@ random access is the point: a row can be restored with no copy of the picture in
 
 Each screen row `r` below the horizon is a slice of road at distance `200 / r` segments. Walking up the screen walks
 along the road, and the bend accumulates as a second difference (`dx += curve; x += dx`): the cheap way the arcade
-machines of the 1980s bent a road, with no 3D maths. Segments alternate in pairs for the stripes.
+machines of the 1980s bent a road, with no 3D maths. What a row shows depends on the section's surface: dashed
+centre and edge lines on asphalt, the joints of basalt setts every few segments, patches on worn asphalt, zebra
+crossings in town. The kerb is a pavement edge, coloured by the ground beside it. No stripes alternate, and nothing
+changes from edge to edge unless the road moves.
 
 Objects are projected the other way, `r = 200 / distance`, and sized in proportion to `r`. Sprites are scaled by
 nearest neighbour as they are copied, so one small source covers every distance. Potholes are a hash of the segment
@@ -87,6 +93,12 @@ So the renderer now tracks, per row, the span that changed: the road's extent no
 This is why the ground beside the road is flat and no longer alternates in bands: moving bands would change every row
 from edge to edge. Kerbs and road marks carry the sense of speed. Sky and road are flushed separately, so a palm top doesn't
 drag a full-width band of sky along with the road.
+
+**The table measures 1.0.1.** The street of the current source sends fewer pixels in the host's panel model (33,604
+per frame in play on average, against 37,371 before; modelled, not timed). On the board (firmware `82b8925`, 128 KiB
+profile) it measured 15.7 to 25.6 fps driving leg 1, median about 18.5, over six 5-second windows, and 20 to 30 fps in
+attract and the menus. That is at least as fast as 1.0.1, but it was a different firmware and a hand-driven session,
+not the scripted run above, so the two are not strictly comparable. See [testing.md](testing.md).
 
 The fixed timestep holds game speed down to about 10 fps (three ticks a frame). Below that the game runs slightly
 slow. Busy scenes with pines and houses reached a low of about 12 fps in these runs, so the margin is real but not large.

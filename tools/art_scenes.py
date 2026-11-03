@@ -38,20 +38,37 @@ class Paint:
         self.d.line([(x0 * S, y0 * S), (x1 * S, y1 * S)], fill=c, width=max(1, round(w * S)))
 
     def sky(self, stops):
-        """Bands of colour from top to bottom: flat bands compress, gradients do not."""
+        """Bands of colour from top to bottom, each step softened by a row of checker
+        dither: flat bands compress, and the eye reads the steps as a gradient."""
+        bands = []
         for i in range(len(stops) - 1):
             (y0, a), (y1, b) = stops[i], stops[i + 1]
-            bands = max(1, (y1 - y0) // 5)
-            for k in range(bands):
-                t = k / bands
+            n = max(1, (y1 - y0) // 5)
+            for k in range(n):
+                t = k / n
                 c = tuple(round(a[j] + (b[j] - a[j]) * t) for j in range(3))
-                self.rect(0, y0 + (y1 - y0) * k / bands, W, (y1 - y0) / bands + 1, c)
+                bands.append((y0 + (y1 - y0) * k / n, (y1 - y0) / n, c))
+        for y, h, c in bands:
+            self.rect(0, y, W, h + 1, c)
+        for (y, h, c), (_, _, below) in zip(bands, bands[1:]):
+            row = int(y + h) - 1
+            for x in range(0, W, 2):
+                self.rect(x + (row & 1), row, 1, 1, below)
+                self.rect(x + 1 - (row & 1), row + 1, 1, 1, c)
 
-    def cloud(self, x, y, w, c):
+    def cloud(self, x, y, w, c, under=None):
+        """A cumulus: puffs, a flat shaded base, the top catching the light."""
         r = self.rng
-        for _ in range(7):
+        under = under or tuple(max(v - 26, 0) for v in c)
+        puffs = []
+        for _ in range(9):
             dx = r.uniform(-w / 2, w / 2)
-            self.disc(x + dx, y + r.uniform(-1, 1), r.uniform(w / 8, w / 4) * (1 - abs(dx) / w), r.uniform(1, 2.6), c)
+            puffs.append((x + dx, y + r.uniform(-1.2, 0.6), r.uniform(w / 9, w / 4.5) * (1 - abs(dx) / w), r.uniform(1.2, 3.0)))
+        for px, py, rx, ry in puffs:
+            self.disc(px, py + 0.8, rx, ry, under)
+        for px, py, rx, ry in puffs:
+            self.disc(px, py - 0.3, rx * 0.92, ry * 0.8, c)
+        self.rect(x - w / 2.4, y + 1.2, w / 1.2, 1.2, under)
 
     def ridge(self, x0, x1, heights, base, c, rough=1.2, step=2):
         """A mountain silhouette through (x, height) knots, with a little noise."""
@@ -73,18 +90,42 @@ class Paint:
         self.poly(pts, c)
 
     def sea(self, y0, y1, far, near, glint=None, glints=40):
+        """Water darkening towards the viewer, with glints and wave strokes."""
         for k in range(y1 - y0):
             t = k / max(y1 - y0 - 1, 1)
             c = tuple(round(far[j] + (near[j] - far[j]) * (int(t * 4) / 3)) for j in range(3))
             self.rect(0, y0 + k, W, 1, c)
+        r = self.rng
+        dark = tuple(max(v - 22, 0) for v in near)
+        for _ in range(glints):
+            y = r.uniform(y0 + 2, y1)
+            self.rect(r.uniform(0, W), y, r.uniform(3, 6 + (y - y0) / 2), 0.6, dark)
         if glint:
-            r = self.rng
             for _ in range(glints):
                 y = r.uniform(y0, y1)
                 self.rect(r.uniform(0, W), y, r.uniform(2, 5 + (y - y0)), 0.5, glint)
 
-    def houses(self, x0, x1, base, hmin, hmax, tones, roof=None, wmin=5, wmax=11, windows=(52, 46, 44)):
-        """A dense block of southern houses: flat walls, dark window dots."""
+    def foam(self, x0, x1, y, c=(236, 242, 240)):
+        r = self.rng
+        x = x0
+        while x < x1:
+            w = r.uniform(2, 7)
+            self.rect(x, y + r.uniform(-0.4, 0.4), w, 0.7, c)
+            x += w + r.uniform(1, 5)
+
+    def haze(self, y0, y1, c, strength=0.45):
+        """Mist lying at the foot of the hills: depth without another outline."""
+        img = self.img
+        box = (0, int(y0 * S), W * S, int(y1 * S))
+        region = img.crop(box)
+        overlay = Image.new("RGB", region.size, c)
+        mask = Image.linear_gradient("L").resize(region.size).point(lambda v: int(v * strength))
+        img.paste(Image.composite(overlay, region, mask), box)
+
+    def houses(self, x0, x1, base, hmin, hmax, tones, roof=None, wmin=5, wmax=11, windows=(52, 46, 44),
+               shutters=None, washing=False):
+        """A dense block of southern houses: a lit face and a shaded side, windows with
+        shutters, now and then a balcony and the washing."""
         r = self.rng
         x = x0
         while x < x1:
@@ -92,15 +133,27 @@ class Paint:
             h = r.uniform(hmin, hmax)
             c = r.choice(tones)
             self.rect(x, base - h, w, h, c)
-            shade = tuple(max(v - 28, 0) for v in c)
-            self.rect(x + w - 1.2, base - h, 1.2, h, shade)
+            shade = tuple(max(v - 30, 0) for v in c)
+            light = tuple(min(v + 14, 255) for v in c)
+            self.rect(x + w - max(1.2, w * 0.18), base - h, max(1.2, w * 0.18), h, shade)
+            self.rect(x, base - h, w, 0.6, light)
             if roof and r.random() < 0.45:
                 self.poly([(x - 0.3, base - h), (x + w / 2, base - h - 2), (x + w + 0.3, base - h)], roof)
+            elif r.random() < 0.5:
+                self.rect(x - 0.3, base - h - 0.8, w + 0.6, 0.8, shade)          # a terrace's parapet
             if h > 6 and windows:
                 for wy in range(int(base - h + 2), int(base - 2), 3):
+                    balcony = r.random() < 0.18 and w > 6
                     for wx in range(int(x + 1.5), int(x + w - 1.5), 3):
-                        if r.random() < 0.65:
-                            self.rect(wx, wy, 1, 1.2, windows)
+                        if r.random() < 0.7:
+                            self.rect(wx, wy, 1, 1.4, windows)
+                            if shutters and r.random() < 0.5:
+                                self.rect(wx - 0.4, wy, 0.4, 1.4, shutters)
+                    if balcony:
+                        self.rect(x + 0.8, wy + 1.5, w - 1.6, 0.5, shade)
+                        if washing and r.random() < 0.5:
+                            for k in range(int(w // 2)):
+                                self.rect(x + 1 + k * 2, wy + 2, 1, 0.9, r.choice(((240, 240, 236), (214, 82, 70), (238, 200, 80))))
             x += w * r.uniform(0.75, 1.0)
 
     def palm(self, x, base, h, trunk=(92, 70, 48), frond=(36, 88, 52), frond2=(58, 118, 66)):

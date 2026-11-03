@@ -26,13 +26,20 @@ speed. A two-stroke sings by coughing, so the note's restart is the sound.
 Pattern/order lists, as on 8-bit trackers: a pattern is a 4/4 bar of 16 sixteenths, and a song lists one (pattern,
 transposition) pair per voice per bar. Tempo is a whole number of 33 ms frames per step. Adapted from *You Have Got
 Pizza: Deluxe Edition*, whose [audio notes](https://github.com/riscv-prg32/YouHaveGotPizza-DeluxeEdition) explain why
-a cartridge sequencer is used instead of the firmware's tracker. Total: 1,968 bytes of patterns, 1,792 of order
-lists, 108 of effects.
+a cartridge sequencer is used instead of the firmware's tracker. Total: 2,336 bytes of patterns, 1,792 of order
+lists, 125 of effects.
 
 ## The score
 
-Written for this game. Only melodies and chord charts are written by hand, and the accompaniment follows fixed rules
-in the tool. Melodies must use chord tones on beats 1 and 3, checked at build time.
+Written for this game. Only melodies and chord charts are written by hand, and the accompaniment follows rules in the tool:
+
+- the bass ends each bar with a chromatic step into the next chord's root;
+- in the second half of a song the bass walks (root, third, fifth, sixth) instead of oom-pah, the organ holds
+  chords instead of stabbing off-beats, and the mandolin runs down the chord instead of up;
+- the drums play a fill at the end of every four bars and a crash at the start of every eight.
+
+At the stalls, each melon sold rings the till, transposed up as the count rises; driving past a stall gets a
+disappointed two-note horn. Melodies must use chord tones on beats 1 and 3, checked at build time.
 
 | Song | Key | Step | Quarter tempo | Used |
 |---|---|---:|---:|---|
@@ -49,7 +56,7 @@ the Neapolitan chord (B flat in A minor, E flat in D minor). Those are common co
 
 ## Measured
 
-Through the firmware's own mixer (`tests/render_music.c`): see `docs/data/audio_metrics.csv`. Peaks are about 10,500
+Through the firmware's own mixer (`tests/render_music.c`): see `docs/data/audio_metrics.csv`. Peaks are about 11,500
 to 12,100 of 32,767, so nothing clips. Stereo correlation is 0.91 to 0.93, a fairly narrow image.
 
 **Nobody has listened to this yet.** An AI composed it from theory and measurements; whether it is any good, and

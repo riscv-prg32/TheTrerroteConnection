@@ -21,6 +21,7 @@
 prg32_audio_state_t g_prg32_audio;
 void prg32_audio_lock(void) {}
 void prg32_audio_unlock(void) {}
+void prg32_audio_wait_ms(uint32_t ms) { (void)ms; }   /* newer mixers call it from a path not used here */
 
 #define TR_NOTE_ON(ch, inst, note, vol, pan) \
     prg32_audio_note_on_pan((uint8_t)(ch), (uint8_t)(inst), (uint8_t)(note), (uint8_t)(vol), (int8_t)(pan))

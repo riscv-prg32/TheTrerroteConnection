@@ -187,15 +187,8 @@ static void test_anchors(void) {
             uint32_t seg = (uint32_t)(a[1] | (a[2] << 8));
             int where = (int8_t)a[3];
             if (a[0] == ANCHOR_STALL) {
-                /* The wrong side of the road delivers nothing. */
-                g.x = (int16_t)(-where * 100);
-                int m = g.melons;
-                tr_cross_segment(&g, seg);
-                CHECK(g.melons == m);
-                g.x = (int16_t)(where * 100);
-                tr_cross_segment(&g, seg);
-                CHECK(g.melons == m - TR_DELIVERY);
                 ++stalls;
+                continue;
             } else {
                 int next = g.food_next;
                 g.x = (int16_t)where;
@@ -213,6 +206,97 @@ static void test_anchors(void) {
 }
 
 /* There must be enough chances on the road for all five foods and all the stalls. */
+/* Put the Ape at a segment of the road, at a lateral position and speed. */
+static void park_at(int seg, int x, int spd) {
+    g.pos = (seg << 8) - TR_PLAYER_Z + 128;
+    g.last_seg = (uint32_t)seg;
+    g.x = (int16_t)x;
+    g.spd = (int16_t)spd;
+}
+
+/* The mellonaro buys only from an Ape that stops in his bay, on his side,
+ * and takes one melon every TR_HAND_TICKS. Pass him by and the sale is gone. */
+static void test_stall_needs_a_stop(void) {
+    start(2);
+    int found = -1;
+    for (int i = 0; i < g.anchor_count; ++i)
+        if (anchor_data[(g.anchor_first + i) * 4] == ANCHOR_STALL) { found = i; break; }
+    CHECK(found >= 0);
+    const uint8_t *a = anchor_data + (g.anchor_first + found) * 4;
+    int seg = a[1] | (a[2] << 8), where = (int8_t)a[3];
+
+    /* Rolling past at speed, on the right side: nothing. */
+    park_at(seg - 2, where * 120, 100);
+    int m = g.melons;
+    for (int t = 0; t < 4; ++t) tr_stalls_update(&g);
+    CHECK(g.melons == m);
+    /* Stopped, but on the wrong side of the road: nothing. */
+    park_at(seg - 2, -where * 120, 0);
+    for (int t = 0; t < 4 * TR_HAND_TICKS; ++t) tr_stalls_update(&g);
+    CHECK(g.melons == m);
+    /* Stopped on his side: one melon at a time, TR_DELIVERY in all, then done. */
+    park_at(seg - 2, where * 120, 0);
+    for (int t = 0; t < TR_HAND_TICKS; ++t) tr_stalls_update(&g);
+    CHECK(g.melons == m - 1);
+    CHECK(g.stall_now == found);
+    for (int t = 0; t < 10 * TR_HAND_TICKS; ++t) tr_stalls_update(&g);
+    CHECK(g.melons == m - TR_DELIVERY);
+    CHECK(g.delivered == TR_DELIVERY);
+    CHECK((g.anchor_taken >> found) & 1u);
+    CHECK(g.stall_now == -1);
+
+    /* A stall driven past is lost, and says so. */
+    start(2);
+    park_at(seg + TR_STALL_AFTER + 1, where * 120, 120);
+    g.event_count = 0;
+    tr_stalls_update(&g);
+    CHECK((g.anchor_taken >> found) & 1u);
+    CHECK(count_events(EV_MISSED) == 1);
+    CHECK(g.delivered == 0);
+    /* Leaving half-way keeps what was sold. */
+    start(2);
+    park_at(seg, where * 120, 0);
+    for (int t = 0; t < 2 * TR_HAND_TICKS; ++t) tr_stalls_update(&g);
+    CHECK(g.delivered == 2);
+    park_at(seg + TR_STALL_AFTER + 1, where * 120, 120);
+    g.event_count = 0;
+    tr_stalls_update(&g);
+    CHECK(g.delivered == 2);
+    CHECK(count_events(EV_MISSED) == 0);
+}
+
+/* A double-parked car stops the Ape dead and costs a melon, and does not move. */
+static void test_double_parking(void) {
+    start(2);
+    tr_tick(&g, 0);
+    while (g.phase != PH_PLAY) tr_tick(&g, 0);
+    for (int i = 0; i < TR_MAX_CARS; ++i) g.cars[i].kind = CAR_NONE;
+    g.spawn_timer = 1000;
+    g.x = 180;
+    g.spd = 100;
+    g.cars[0].kind = CAR_PARKED;
+    g.cars[0].z = g.pos + TR_PLAYER_Z + 120;
+    g.cars[0].x = 190;
+    g.cars[0].spd = 0;
+    int32_t z = g.cars[0].z;
+    int m = g.melons;
+    tr_collide_cars(&g);
+    CHECK(g.spd == 0);
+    CHECK(g.melons == m - 1);
+    CHECK(g.cars[0].z == z);
+    CHECK(tr_abs(g.x - g.cars[0].x) > tr_car_half(CAR_PARKED) + 44);
+    /* Traffic goes round it. */
+    g.cars[1].kind = CAR_PLAIN;
+    g.cars[1].z = z - 4 * 256;
+    g.cars[1].x = 190;
+    g.cars[1].target_x = 190;
+    g.cars[1].spd = 60;
+    g.cars[1].anim = 1;
+    for (int t = 0; t < 80; ++t) tr_traffic_update(&g);
+    CHECK(g.cars[1].z > z);
+    CHECK(tr_abs(g.cars[1].x - 190) >= 100);
+}
+
 static void test_journey_has_enough(void) {
     int foods = 0, stalls = 0;
     for (int l = 0; l < LEVEL_COUNT; ++l) {
@@ -296,6 +380,8 @@ int main(void) {
     test_horn_scatters();
     test_potholes();
     test_anchors();
+    test_stall_needs_a_stop();
+    test_double_parking();
     test_journey_has_enough();
     test_no_melons_ends_it();
     test_journeys();

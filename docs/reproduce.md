@@ -63,6 +63,17 @@ scripts/make_docs_data.sh
 scripts/qemu_preview.py --script preview --video --out build/qemu-preview
 ```
 
+The one-minute preview in `docs/media/preview.mp4`:
+
+```bash
+scripts/qemu_preview.py --script preview60 --video --seconds 60 --out build/qemu-preview60
+```
+
+Video frames are taken on the audio clock, so a sound and the picture that caused it line up. PRG32 QEMU produces
+audio paced by flow-control credits, and on a busy host it runs slower than the game clock: in the committed
+preview the game's timer fell about 78 seconds over 45 seconds of video (observed), so play looks about 1.5 to 1.7
+times faster than the music. The board has no such gap.
+
 ```bash
 python3 tools/make_store_art.py build/qemu-preview/store.png
 ```

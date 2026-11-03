@@ -12,7 +12,7 @@ Validation levels, strongest first:
 Every level also checks the rules from the Store's API documentation:
 manifest `abi` == prg32-metadata-1.0, icon/splash are PNG or JPEG, both
 `esp32c6` and `qemu` variants, unique architectures, rebuilt images within the
-64 KiB package limit. Exit code 0 means the bundle is ready for submission.
+128 KiB package limit (PRG32's large cartridge profile). Exit code 0 means the bundle is ready for submission.
 
 Adapted from tools/validate_bundle.py of Drumfight Napoli 97 and Galleria2007 (PRG32 project family,
 MIT).
@@ -25,7 +25,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-LIMIT = 64 * 1024
+LIMIT = 128 * 1024
 ROOT = Path(__file__).resolve().parents[1]
 
 

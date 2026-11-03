@@ -19,7 +19,15 @@ the journey, from morning in Naples to sunset at Baia Domizia.
 | Mondragone | Monte Petrino and its ruined Rocca, the town, the lidos, and the buffalo of the plain |
 | Baia Domizia | Umbrella pines, rows of beach umbrellas, a sunset over the sea (this coast faces west), Monte Massico and Roccamonfina inland, Ponza on the horizon |
 
-Sprites: `assets/png/sprites.png`.
+Skies change band by band with a dithered row between bands, clouds have shaded undersides, the sea has wave strokes
+and foam, and house fronts have a lit and a shaded face, parapets, balconies and shutters.
+
+Views take 3.6 to 5.9 KB each (38.6 KB in all), sprites 15.2 KB.
+
+Sprites: `assets/png/sprites.png`. Every one is outlined and shaded in two or three tones: the Ape, cars, the
+mozzarella truck with its buffalo, a Vespa with three riders, passers-by, the street furniture (palms, pines, lamps,
+two house fronts, beach umbrellas, a shrine, bins, a washing line), the stall, the ferry, Patrizia, and the six
+town signs that end the legs.
 
 ![Sprites](media/sprites.png)
 

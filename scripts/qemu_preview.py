@@ -41,15 +41,18 @@ PRG32 = Path(os.environ.get("PRG32_REPO", ROOT.parent / "PRG32")).resolve()
 CONSOLE_PORT, AUDIO_PORT, QMP_PORT = 4532, 4531, 4533
 RATE = 22050
 
-# PRG32 QEMU UART keyboard: w/s/a/d directions, j = A, k = B, Enter = START.
-# The firmware holds every key for 120 ms; a longer press is a stream of keys.
-KEYS = {"left": "a", "right": "d", "up": "w", "down": "s", "a": "j", "b": "k", "start": "\r"}
+# PRG32 QEMU UART keyboard: w/s/a/d directions, h = A, j = B, Enter = START.
+# (Before PRG32 82b8925, which added C/D/L/R, it was j = A and k = B; with the
+# old map, a held "gas" is now a held brake.) The firmware holds every key for
+# 120 ms; a longer press is a stream of keys.
+KEYS = {"left": "a", "right": "d", "up": "w", "down": "s", "a": "h", "b": "j", "start": "\r"}
 
 # The firmware boots into its setup menu: choose "run cartridge", then cart0.
 BOOT = [(7.0, "key", "a"), (1.5, "key", "a"), (2.0, "wait", None)]
 
 # (delay seconds, action, argument). Actions: key, hold (key, seconds), chord
-# (keys, seconds: several held together), shot, rec, wait.
+# (keys, seconds: several held together), shot, rec, wait, repeat (n: the
+# previous n steps again, until the video is complete).
 SCRIPTS = {
     "smoke": [
         *BOOT,
@@ -91,15 +94,32 @@ SCRIPTS = {
         (13.0, "shot", "store"),
         (4.0, "wait", None),
     ],
-    # A minute of it, for watching rather than for the Store: the attract mode runs
-    # to its end and comes back round to the tribute.
+    # A minute of it, for watching rather than for the Store: tribute, the leg's
+    # briefing, then leg 1 with gas, steering and the horn, repeated until a
+    # minute of sound has been recorded.
     "preview60": [
         *BOOT,
         (0.3, "rec", None),
+        (3.0, "key", "a"),
         (3.5, "key", "a"),
-        (10.5, "wait", None),
-        (25.0, "shot", "store60"),
-        (24.0, "wait", None),
+        (2.0, "hold", ("a", 6.0)),
+        (0.0, "chord", (("a", "right"), 1.0)),
+        (0.0, "hold", ("a", 4.0)),
+        (0.0, "chord", (("a", "up"), 0.6)),
+        (0.0, "chord", (("a", "left"), 1.5)),
+        (0.0, "hold", ("a", 5.0)),
+        (0.0, "shot", "store60"),
+        (0.0, "chord", (("a", "right"), 1.2)),
+        (0.0, "hold", ("a", 6.0)),
+        (0.0, "chord", (("a", "left"), 1.0)),
+        (0.0, "hold", ("a", 5.0)),
+        (0.0, "chord", (("a", "up"), 0.6)),
+        (0.0, "hold", ("a", 5.0)),
+        (0.0, "chord", (("a", "right"), 1.0)),
+        (0.0, "hold", ("a", 6.0)),
+        (0.0, "chord", (("a", "left"), 1.2)),
+        (0.0, "hold", ("a", 6.0)),
+        (0.0, "repeat", 10),
     ],
 }
 
@@ -173,16 +193,26 @@ def rgb565_image(raw: bytes) -> Image.Image:
 
 
 def audio_reader(sock: socket.socket, stop: threading.Event, pcm: bytearray):
-    """Grant one 20 ms audio credit ('K') every 20 ms and collect the PCM."""
+    """Grant 20 ms audio credits ('K'), at most one every 20 ms and never more
+    than a few ahead of the PCM received, and collect the PCM.
+
+    Credits granted on the wall clock alone pile up in the firmware's UART buffer
+    whenever QEMU runs slower than real time (driving, frame grabs); after
+    40 to 50 s of that the audio stream stopped. PRG32's own capture tool grants
+    one credit per chunk received, as this does, with a small lead."""
+    chunk = int(RATE * 0.02) * 2          # one 20 ms credit of 16-bit mono
+    ahead = 4
+    sent = 0
     sock.settimeout(0.005)
     next_credit = time.monotonic()
     while not stop.is_set():
         now = time.monotonic()
-        if now >= next_credit:
+        if now >= next_credit and sent - len(pcm) // chunk < ahead:
             try:
                 sock.sendall(b"K")
             except OSError:
                 return
+            sent += 1
             next_credit += 0.02
             if next_credit < now - 0.2:
                 next_credit = now
@@ -273,21 +303,35 @@ def main() -> int:
             video_stop = threading.Event()
             audio_mark = [0]
 
-            rec_times = [0.0, 0.0]
+            video_done = threading.Event()
 
+            # Frames are taken on the audio clock, not the wall clock. PRG32 QEMU
+            # clocks its audio by game frames, so when emulation slows (driving, on
+            # a busy host) a wall-clock minute holds less than a minute of sound;
+            # frame n is grabbed once n/fps seconds of audio have arrived, so the
+            # picture stays on the sound however fast QEMU runs.
             def recorder():
-                n = 0
-                rec_times[0] = time.monotonic()
-                period = 1.0 / args.fps
-                nxt = time.monotonic()
-                while not video_stop.is_set():
-                    p = tmp / f"frame{n:05d}.png"
-                    grab(p)
-                    frames.append(p)
-                    n += 1
-                    nxt += period
-                    time.sleep(max(0.0, nxt - time.monotonic()))
-                rec_times[1] = time.monotonic()
+                n, want = 0, int(round(args.seconds * args.fps))
+                step = 2 * RATE / args.fps          # bytes of 16-bit mono per frame
+                seen, seen_at = len(pcm), time.monotonic()
+                try:
+                    while not video_stop.is_set() and n < want:
+                        if len(pcm) != seen:
+                            seen, seen_at = len(pcm), time.monotonic()
+                        elif time.monotonic() - seen_at > 10:
+                            print(f"warning: no audio for 10 s; video stops at {n} frames", file=sys.stderr)
+                            break
+                        if len(pcm) - audio_mark[0] < n * step:
+                            time.sleep(0.005)
+                            continue
+                        p = tmp / f"frame{n:05d}.png"
+                        grab(p)
+                        frames.append(p)
+                        n += 1
+                except Exception as e:  # never leave a "repeat" waiting for frames that won't come
+                    print(f"warning: recorder stopped at frame {n}: {e!r}", file=sys.stderr)
+                finally:
+                    video_done.set()
 
             def tap(name: str, seconds: float = 0.12):
                 end = time.monotonic() + seconds
@@ -298,7 +342,18 @@ def main() -> int:
                         break
 
             rec = None
-            for i, (delay, action, arg) in enumerate(SCRIPTS[args.script]):
+            steps = list(SCRIPTS[args.script])
+            i = 0
+            while i < len(steps):
+                delay, action, arg = steps[i]
+                i += 1
+                if action == "repeat":
+                    # Repeat the previous `arg` steps until the video is complete.
+                    if args.video and rec is not None and not video_done.is_set():
+                        i -= arg + 1
+                    continue
+                if video_done.is_set() and action in ("hold", "chord", "wait"):
+                    continue
                 time.sleep(delay)
                 if args.video and rec is None and action == "rec":
                     audio_mark[0] = len(pcm)
@@ -345,10 +400,8 @@ def main() -> int:
             ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
             for k, f in enumerate(frames):        # crop the firmware status bands
                 Image.open(f).crop((0, 20, 320, 220)).resize((640, 400), Image.NEAREST).save(tmp / f"v{k:05d}.png")
-            # The frame rate actually achieved: encoding at the requested one would
-            # slowly pull the picture away from the sound.
-            elapsed = rec_times[1] - rec_times[0]
-            fps = len(frames) / elapsed if elapsed > 0 else args.fps
+            # Frames sit on the audio clock, so the requested rate is the true one.
+            fps = args.fps
             seconds = len(frames) / fps
             mp4 = args.out / "preview.mp4"
             subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", f"{fps:.4f}",

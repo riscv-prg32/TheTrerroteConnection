@@ -17,11 +17,13 @@ The first tuning, on the five-leg journey of 1.0, could not be finished at all: 
 | Tamarri re-aim every 4 s, only when well ahead | They were unavoidable |
 | One melon per hit (truck: three) | Two a hit emptied the Ape by leg 4 |
 | Empty after delivering no longer ends the game | It punished good deliveries, ending 60% of runs reaching leg 5 |
+| Time limits raised by 2 to 11 s | Stalls now need a stop, and double-parked cars block lanes |
+| Autoplayer pulls over for stalls, ignores parked cars it is passing | It ran past stalls, and braked behind cars it could overtake |
 
 ## Result
 
-The autoplayer now finishes about 95% of journeys over the six legs, with all five foods, delivering about 16 melons
-(measured over 1,000 journeys; see the CSV for current numbers). Almost all the failures are time running out on the
-last leg. Time limits leave it 10 to 18 seconds' margin per leg, by intent: tight for a machine, and probably
+The autoplayer now finishes 94% of journeys over the six legs (940 of 1,000), with all five foods, delivering 16.3
+melons on average (measured; see the CSV for current numbers). All the failures are time running out, on the last two
+legs: 46 on leg 5, 14 on leg 6. Time limits leave it 13 to 23 seconds' margin per leg on average, by intent: tight for a machine, and probably
 tighter than that for a person. If play-testers run out of time, widen
 `time` in `tools/levels.py` first.

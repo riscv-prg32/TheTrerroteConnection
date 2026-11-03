@@ -77,7 +77,7 @@ typedef struct {
 
 static struct {
     uint8_t line[VIEW_W + 8];
-    uint8_t src[128];
+    uint8_t src[256];
     uint16_t palette[PALETTE_SIZE];
     uint8_t cell[PALETTE_SIZE];     /* each colour's index on the framebuffer */
     prg32_indexed_sprite_t row;
@@ -95,7 +95,7 @@ static struct {
 
     /* The road as computed for this frame: one entry per row. */
     int16_t center[TR_ROWS + 1];
-    uint8_t width[TR_ROWS + 1], ground_l[TR_ROWS + 1], ground_r[TR_ROWS + 1];
+    uint8_t width[TR_ROWS + 1], ground_l[TR_ROWS + 1], ground_r[TR_ROWS + 1], surface[TR_ROWS + 1];
     int32_t z_row[TR_ROWS + 1];
     int16_t unit[TR_ROWS + 1];
     /* The road as last sent, to know which part of each row has changed. */
@@ -111,7 +111,7 @@ static struct {
     uint8_t load_count, engine_timer, intro_level;
 
     uint32_t hud_seconds, hud_score;
-    int hud_kmh, hud_melons, hud_food, hud_bar;
+    int hud_melons, hud_food, hud_bar, hud_msg, msg_timer, msg_shown;
     tr_music_t music;
 } v;
 
@@ -315,6 +315,18 @@ static void decode_row(const uint8_t *data, uint8_t *out, int width, int base) {
     }
 }
 
+/* A view row: (index << 2) | run, 64 colours, or run 0 and the run in the next byte. */
+static void decode_view_row(const uint8_t *data, uint8_t *out, int width, int base) {
+    int x = 0;
+    while (x < width) {
+        unsigned b = *data++;
+        unsigned run = b & 3u;
+        uint8_t value = (uint8_t)((b >> 2) + (unsigned)base);
+        if (!run) run = *data++;
+        while (run--) out[x++] = value;
+    }
+}
+
 static void tint_colors(int tint, uint8_t *a, uint8_t *b) {
     switch (tint) {
     case TINT_RED: *a = C_RED; *b = C_REDD; break;
@@ -380,19 +392,20 @@ static void road_compute(void) {
         v.width[r] = s.width;
         v.ground_l[r] = s.ground_l;
         v.ground_r[r] = s.ground_r;
+        v.surface[r] = s.surface;
     }
 }
 
 /* Flat, deliberately: bands of ground passing at speed would make every row change
- * from edge to edge, and the display cannot afford it. Kerbs and road marks carry the
- * sense of speed. */
+ * from edge to edge, and the display cannot afford it. The road's own surface carries
+ * the sense of speed. */
 static uint8_t ground_color(int ground) {
     static const uint8_t colors[5] = {C_PAVE, C_SEA, C_SAND, C_GRASS, C_TUFF};
     return colors[ground];
 }
 
 static int road_half(int r) { return (v.unit[r] * v.width[r]) >> 4; }
-static int road_kerb(int half) { return half / 10 + 1; }
+static int road_kerb(int half) { return half / 12 + 1; }
 
 static void fill(uint8_t *line, int x0, int x1, uint8_t color) {
     if (x0 < 0) x0 = 0;
@@ -400,23 +413,63 @@ static void fill(uint8_t *line, int x0, int x1, uint8_t color) {
     for (int x = x0; x < x1; ++x) line[x] = color;
 }
 
+/* Road units (+-256 at the edge of a full road) to a screen column on row r. */
+static int road_x(int r, int units) { return v.center[r] + ((units * v.unit[r]) >> 8); }
+
+static uint32_t seg_hash(uint32_t seg) { return (seg + 977u * game.level) * 2654435761u; }
+
+/* No rumble strips: a kerb of grey stone, the street's own surface, its own marks.
+ * Basoli are the basalt blocks of the old streets, laid in staggered courses. */
 static void draw_road_row(uint8_t *line, int r) {
     uint32_t z = (uint32_t)game.pos + (uint32_t)v.z_row[r];
+    uint32_t seg = z >> 8;
     int center = v.center[r];
     int half = road_half(r);
-    int stripe = (z >> 9) & 1u;
-    uint8_t lg = ground_color(v.ground_l[r]), rg = ground_color(v.ground_r[r]);
     int kerb = road_kerb(half);
-    fill(line, 0, center - half - kerb, lg);
-    fill(line, center + half + kerb, PRG32_GAME_W, rg);
-    uint8_t kerb_color = stripe ? C_RED : C_CREAM;
-    fill(line, center - half - kerb, center - half, kerb_color);
-    fill(line, center + half, center + half + kerb, kerb_color);
-    fill(line, center - half, center + half, stripe ? C_ROAD2 : C_ROAD);
-    if (((z >> 10) & 1u)) {
-        int mark = half / 48 + 1;
-        fill(line, center - mark, center + mark, C_LINE);
+    int ground_l = v.ground_l[r], ground_r = v.ground_r[r];
+    fill(line, 0, center - half - kerb, ground_color(ground_l));
+    fill(line, center + half + kerb, PRG32_GAME_W, ground_color(ground_r));
+    /* A kerb only where there is a pavement or a wall; elsewhere the tarmac just ends. */
+    uint8_t kl = ground_l == GROUND_PAVE || ground_l == GROUND_TUFF ? C_KERB : C_KERBD;
+    uint8_t kr = ground_r == GROUND_PAVE || ground_r == GROUND_TUFF ? C_KERB : C_KERBD;
+    fill(line, center - half - kerb, center - half, kl);
+    fill(line, center + half, center + half + kerb, kr);
+    int edge = 256 * v.width[r] / 16;
+    int surface = v.surface[r];
+    if (surface == SURFACE_BASOLI) {
+        fill(line, center - half, center + half, C_BASALT);
+        if (((z >> 6) & 3u) == 0) {
+            fill(line, center - half, center + half, C_JOINT);       /* the course's joint */
+        } else if (v.unit[r] > 20) {
+            int offset = (seg & 1u) ? 40 : 0;
+            for (int u = -edge + offset + 40; u < edge; u += 80) {
+                int x = road_x(r, u);
+                fill(line, x, x + 1 + (v.unit[r] >> 7), C_JOINT);
+            }
+        }
+        return;
     }
+    fill(line, center - half, center + half, C_ROAD);
+    int mark = half / 48 + 1;
+    if (surface == SURFACE_WORN) {
+        /* Patched and patched again: a rectangle of darker tarmac on some segments. */
+        uint32_t h = seg_hash(seg >> 1);
+        if (((h >> 28) & 3u) == 0) {
+            int u0 = (int)((h >> 8) & 255u) * 2 * edge / 255 - edge, u1 = u0 + 50 + (int)((h >> 16) & 63u);
+            if (u1 > edge) u1 = edge;
+            fill(line, road_x(r, u0), road_x(r, u1), C_PATCH);
+        }
+        if (((z >> 10) & 1u) && ((h >> 20) & 3u)) fill(line, center - mark, center + mark, C_LINE);
+        return;
+    }
+    /* Clean asphalt: a dashed centre line, continuous edge lines, and in town the
+     * zebra crossings that nobody stops at. */
+    int town = ground_l == GROUND_PAVE || ground_r == GROUND_PAVE;
+    if (town && (seg % 140u) < 3u) {
+        for (int u = -edge + 16; u < edge - 16; u += 64) fill(line, road_x(r, u), road_x(r, u + 32), C_LINE);
+        return;
+    }
+    if (((z >> 10) & 1u)) fill(line, center - mark, center + mark, C_LINE);
     int edge_mark = half / 64 + 1;
     fill(line, center - half + edge_mark, center - half + 2 * edge_mark, C_LINE);
     fill(line, center + half - 2 * edge_mark, center + half - edge_mark, C_LINE);
@@ -442,10 +495,21 @@ static void deco_add(int deco, uint32_t seg, int z, int side, int width) {
     int edge = 256 * width / 16;
     switch (deco) {
     case DECO_PALM: place(SPR_PALM, z, side * (edge + 66), 0, 120, 216, 0); break;
-    case DECO_PINE: place(SPR_PINE, z, side * (edge + 190), 0, 196, 210, 0); break;
-    case DECO_LAMP: place(SPR_LAMP, z, side * (edge + 28), 0, 40, 170, 0); break;
-    case DECO_HOUSE: place(SPR_HOUSE, z, side * (edge + 150), 0, 168, 224, (seg / 7u) % 2u ? TINT_PINK + (seg / 7u) % 3u : TINT_NONE); break;
-    case DECO_UMBRELLA: place(SPR_UMBRELLA, z, side * (edge + 100 + (int)(seg % 40u)), 0, 90, 100, TINT_NONE); break;
+    case DECO_PINE: place(SPR_PINE, z, side * (edge + 190), 0, 196, 208, 0); break;
+    case DECO_LAMP: place(SPR_LAMP, z, side * (edge + 28), 0, 48, 170, 0); break;
+    case DECO_HOUSE:
+        place((seg / 7u) & 1u ? SPR_HOUSE2 : SPR_HOUSE, z, side * (edge + 150), 0, 168, 224,
+              (seg / 5u) % 3u ? TINT_PINK + (seg / 5u) % 4u : TINT_NONE);
+        break;
+    case DECO_UMBRELLA: place(SPR_UMBRELLA, z, side * (edge + 100 + (int)(seg % 40u)), 0, 92, 100, TINT_NONE); break;
+    case DECO_SHRINE: place(SPR_SHRINE, z, side * (edge + 46), 30, 64, 100, 0); break;
+    case DECO_BINS: place(SPR_BINS, z, side * (edge + 70), 0, 116, 72, 0); break;
+    case DECO_WASHING: place(SPR_WASHING, z, 0, 150, 2 * edge * 154 / 256 + 60, 38, 0); break;
+    case DECO_PARKED: {
+        static const uint8_t tints[4] = {TINT_RED, TINT_WHITE, TINT_GREEN, TINT_NONE};
+        place(SPR_CAR, z, side * (edge + 46), 0, 72, 50, tints[(seg >> 2) & 3u]);
+        break;
+    }
     default: break;
     }
 }
@@ -482,9 +546,13 @@ static void add_player(void) {
 static void build_road_sprites(void) {
     uint32_t base = (uint32_t)game.pos >> 8;
     int first = v.count;
-    /* The finish line. */
-    int gate_z = ((int)game.length << 8) - game.pos;
-    if (gate_z > 0 && gate_z < TR_DRAW_SEGS << 8) place(SPR_GATE, gate_z, 0, 0, 340, 150, 0);
+    /* No banner across the road: the white sign where the town begins. */
+    int sign_z = ((int)game.length << 8) - game.pos;
+    if (sign_z > 40 && sign_z < TR_DRAW_SEGS << 8) {
+        int id = SPR_SIGN0 + game.level;
+        tr_section_t s = tr_section_at(&game, game.length - 1u);
+        place(id, sign_z, tr_edge(s.width) + 30 + spr_w[id], 0, spr_w[id] * 12 / 5, 82, 0);
+    }
     /* Traffic. */
     for (int i = 0; i < TR_MAX_CARS; ++i) {
         const tr_car_t *c = &game.cars[i];
@@ -494,8 +562,10 @@ static void build_road_sprites(void) {
         static const uint8_t tam_tint[4] = {TINT_LEMON, TINT_PURPLE, TINT_RED, TINT_LEMON};
         if (c->kind == CAR_PLAIN) place(SPR_CAR, z, c->x, 0, 72, 50, car_tint[c->tint & 3u]);
         else if (c->kind == CAR_TAMARRO) place(SPR_TAMARRO, z, c->x, 0, 76, 53, tam_tint[c->tint & 3u]);
-        else if (c->kind == CAR_TRUCK) place(SPR_TRUCK, z, c->x, 0, 122, 130, 0);
-        else place(SPR_SCOOTER, z, c->x, 0, 36, 54, tam_tint[c->tint & 3u]);
+        else if (c->kind == CAR_TRUCK) place(SPR_TRUCK, z, c->x, 0, 122, 127, 0);
+        else if (c->kind == CAR_PARKED)
+            place((v.app_tick >> 3) & 1u ? SPR_CAR_HAZARD : SPR_CAR, z, c->x, 0, 72, 50, car_tint[c->tint & 3u]);
+        else place(SPR_SCOOTER, z, c->x, 0, 36, 56, tam_tint[c->tint & 3u]);
     }
     /* Melons on the road, and those who want them. */
     for (int i = 0; i < TR_MAX_LOOSE; ++i) {
@@ -517,7 +587,7 @@ static void build_road_sprites(void) {
         int where = (int8_t)a[3];
         if (a[0] == ANCHOR_STALL) {
             tr_section_t s = tr_section_at(&game, (uint32_t)((game.pos + z) >> 8));
-            place(SPR_STAND, z, where * (tr_edge(s.width) + 70), 0, 120, 98, 0);
+            place(SPR_STAND, z, where * (tr_edge(s.width) + 80), 0, 144, 118, 0);
         } else if (!((game.anchor_taken >> i) & 1u) && game.food_next < TR_FOODS) {
             place(SPR_FOOD0 + game.food_next, z, where, 6 + (int)((v.app_tick >> 3) & 3u), 36, 36, 0);
         }
@@ -542,11 +612,12 @@ static void build_road_sprites(void) {
         if (z < 96) continue;
         if (k < 40) {
             int hole = tr_pothole_x(&game, seg, s.holes, s.width);
-            if (hole != -9999) place(SPR_POTHOLE, z, hole, 0, 92, 24, 0);
+            if (hole != -9999) place(SPR_POTHOLE, z, hole, 0, 92, 25, 0);
         }
         if (seg % s.period == 0) {
             if (s.deco_l) deco_add(s.deco_l, seg, z, -1, s.width);
-            if (s.deco_r) deco_add(s.deco_r, seg + 3, z, 1, s.width);
+            if (s.deco_r && s.deco_r != DECO_WASHING) deco_add(s.deco_r, seg + 3, z, 1, s.width);
+            else if (s.deco_r == DECO_WASHING && s.deco_l != DECO_WASHING) deco_add(DECO_WASHING, seg, z, 1, s.width);
         }
     }
     sort_far_to_near(first);
@@ -608,11 +679,12 @@ static void draw_row(int y, int x0, int x1) {
             fill(line, 0, PRG32_GAME_W, y & 8 ? C_SAND : C_SAND2);
         }
     } else if (v.hud && y < HUD_H) {
-        fill(line, 0, PRG32_GAME_W, C_INK);
+        /* The delivery note: cream paper, a ruled line under it. */
+        fill(line, 0, PRG32_GAME_W, y == HUD_H - 1 ? C_KERBD : C_CREAM);
     } else {
         int row = y - HUD_H;
         if (row < 0) row = 0;
-        decode_row(view_data + view_rows[v.view * VIEW_H + row], line, VIEW_W, FIXED_COUNT);
+        decode_view_row(view_data + view_rows[v.view * VIEW_H + row], line, VIEW_W, FIXED_COUNT);
         line += PARALLAX + v.shift;
     }
     for (int i = 0; i < v.count; ++i) {
@@ -683,47 +755,93 @@ static void render(void) {
 /* ---- HUD ----------------------------------------------------------------------- */
 
 static void hud_reset(void) {
-    text_at(0, 0, "TEMPO", C_CREAM);
-    text_at(9, 0, "KM/H", C_CREAM);
-    text_at(17, 0, "MELLONI", C_CREAM);
-    text_at(28, 0, "PUNTI", C_CREAM);
+    text_at(0, 0, "TEMPO", C_INK);
+    text_at(13, 0, "MELLONI", C_INK);
+    text_at(25, 0, "INCASSO", C_INK);
     v.hud_seconds = 0xFFFFFFFFu;
     v.hud_score = 0xFFFFFFFFu;
-    v.hud_kmh = -1;
     v.hud_melons = -1;
     v.hud_food = -1;
     v.hud_bar = -1;
+    v.hud_msg = -1;
+    v.msg_timer = 0;
+    v.msg_shown = -1;
+}
+
+enum { MSG_NONE, MSG_STALL_LEFT, MSG_STALL_RIGHT, MSG_SELLING, MSG_SOLD, MSG_MISSED, MSG_PARKED };
+
+/* One line of advice under the note, in the sky: what the street wants of you now. */
+static void hud_message(void) {
+    int msg = MSG_NONE;
+    if (v.msg_timer) {
+        v.msg_timer--;
+        msg = v.hud_msg;
+    } else if (game.phase == PH_PLAY && game.melons) {
+        int d = 0, stall = tr_next_stall(&game, &d);
+        if (game.stall_now >= 0) {
+            msg = MSG_SELLING;
+        } else if (stall >= 0 && d <= 45 && d >= -TR_STALL_AFTER) {
+            msg = (int8_t)anchor_data[(game.anchor_first + stall) * 4 + 3] < 0 ? MSG_STALL_LEFT : MSG_STALL_RIGHT;
+        }
+    }
+    int key = msg * 16 + (msg == MSG_SELLING ? game.stall_given : 0);
+    if (key == v.msg_shown) return;
+    v.msg_shown = key;
+    char sold[24] = "VENDUTI 0 DI 4";
+    switch (msg) {
+    case MSG_STALL_LEFT: text_center(3, "BANCARELLA A SINISTRA: FERMATI", C_LEMON); break;
+    case MSG_STALL_RIGHT: text_center(3, "BANCARELLA A DESTRA: FERMATI", C_LEMON); break;
+    case MSG_SELLING:
+        sold[8] = (char)('0' + game.stall_given);
+        sold[13] = (char)('0' + TR_DELIVERY);
+        text_center(3, "                              ", C_CREAM);
+        text_center(3, sold, C_CREAM);
+        break;
+    case MSG_SOLD: text_center(3, "GRAZIE, A LA PROSSIMA!", C_CREAM); break;
+    case MSG_MISSED: text_center(3, "BANCARELLA PERSA!", C_LEMON); break;
+    case MSG_PARKED: text_center(3, "CHI HA PARCHEGGIATO QUA?", C_CREAM); break;
+    default: text_clear_line(3); break;
+    }
+}
+
+static void hud_say(int msg, int ticks) {
+    v.hud_msg = msg;
+    v.msg_timer = ticks;
+    v.msg_shown = -1;
+    text_clear_line(3);
 }
 
 static void hud_update(void) {
     uint32_t left = game.ticks < game.time_limit ? (game.time_limit - game.ticks + TR_TICKS_PER_SEC - 1) / TR_TICKS_PER_SEC : 0;
     if (left != v.hud_seconds) {
         v.hud_seconds = left;
-        text_number(6, 0, left, 2, C_CREAM);
-    }
-    int kmh = game.spd * 60 / TR_SPD_MAX;
-    if (kmh != v.hud_kmh) {
-        v.hud_kmh = kmh;
-        text_number(14, 0, (uint32_t)kmh, 2, C_CREAM);
+        char clock[6];
+        clock[0] = (char)('0' + left / 60u % 10u);
+        clock[1] = ':';
+        clock[2] = (char)('0' + left % 60u / 10u);
+        clock[3] = (char)('0' + left % 10u);
+        clock[4] = 0;
+        text_at(6, 0, clock, C_INK);
     }
     if (game.melons != v.hud_melons) {
         v.hud_melons = game.melons;
-        text_number(25, 0, game.melons, 2, C_CREAM);
+        text_number(21, 0, game.melons, 2, C_INK);
     }
     if (game.score != v.hud_score) {
         v.hud_score = game.score;
-        text_number(34, 0, game.score, 6, C_CREAM);
+        text_number(33, 0, game.score, 6, C_INK);
     }
-    /* The second line: from, a little Ape along the route, to. */
+    /* The second line: the route, a little Ape along it, and where it goes. */
     int bar = (int)((game.pos >> 8) * 11 / game.length);
     if (bar > 10) bar = 10;
     if (bar != v.hud_bar) {
         v.hud_bar = bar;
         char route[12];
-        for (int i = 0; i < 11; ++i) route[i] = i == bar ? 'A' : '-';
+        for (int i = 0; i < 11; ++i) route[i] = i == bar ? 'A' : i < bar ? '-' : '.';
         route[11] = 0;
-        text_at(14, 1, route, C_LEMON);
+        text_at(13, 1, route, C_INK);
     }
+    hud_message();
 }
 
 static void hud_sprites(void) {
@@ -737,7 +855,7 @@ static void hud_names(void) {
     const uint8_t *n = level_names + (unsigned)game.level * 32u + 16u;
     for (int i = 0; i < 16; ++i) dest[i] = (char)n[i];
     dest[16] = 0;
-    text_at(26, 1, dest, C_LEMON);
+    text_at(25, 1, dest, C_INK);
 }
 
 /* ---- screens and flow ------------------------------------------------------------ */
@@ -840,7 +958,7 @@ static void intro_screen(int level) {
         text_center(18, "PIANO O I MELLONI VOLANO VIA", C_CREAM);
         break;
     case 2:
-        text_center(17, "CONSEGNA I MELLONI ALLE BANCARELLE", C_CREAM);
+        text_center(17, "FERMATI ALLE BANCARELLE E VENDI", C_CREAM);
         text_center(18, "ATTENTO A LA MONNEZZA DELLA GENTE", C_CREAM);
         break;
     case 3:
@@ -857,6 +975,7 @@ static void intro_screen(int level) {
         break;
     }
     text_center(20, "A: GAS  B: FRENO  SU: CLACSON", C_CREAM);
+    if (level >= 2) text_center(21, "ALLA BANCARELLA: FERMO, DAL SUO LATO", C_CREAM);
     text_center(22, "PREMI A", C_LEMON);
 }
 
@@ -924,13 +1043,13 @@ static void card_screen(void) {
     char b[17];
     level_name_text(b, game.level, 1);
     text_center(8, b, C_LEMON);
-    text_center(9, "ARRIVATO!", C_CREAM);
-    text_at(9, 11, "PUNTI TAPPA", C_CREAM);
-    text_number(23, 11, game.leg_score, 6, C_CREAM);
-    text_at(9, 12, "MELLONI", C_CREAM);
-    text_number(23, 12, game.melons, 6, C_CREAM);
-    text_at(9, 13, "RUBATI", C_CREAM);
-    text_number(23, 13, game.stolen, 6, C_CREAM);
+    text_center(9, "BOLLA DI CONSEGNA", C_CREAM);
+    text_at(9, 11, "INCASSO TAPPA", C_CREAM);
+    text_number(25, 11, game.leg_score, 6, C_CREAM);
+    text_at(9, 12, "MELLONI A BORDO", C_CREAM);
+    text_number(25, 12, game.melons, 6, C_CREAM);
+    text_at(9, 13, "RUBATI FINORA", C_CREAM);
+    text_number(25, 13, game.stolen, 6, C_CREAM);
     text_center(15, "PREMI A", C_LEMON);
     tr_music_play(&v.music, SONG_CLEAR);
 }
@@ -941,7 +1060,7 @@ static void gameover_screen(const char *why) {
     text_panel(7, 15);
     text_center(8, why, C_LEMON);
     text_center(10, "CHE SCENEGGIATA...", C_CREAM);
-    text_at(13, 12, "PUNTI", C_CREAM);
+    text_at(11, 12, "INCASSO", C_CREAM);
     text_number(20, 12, game.score, 6, C_CREAM);
     text_center(14, "PREMI A", C_LEMON);
     tr_music_play(&v.music, SONG_GAMEOVER);
@@ -975,7 +1094,7 @@ static void ending_screen(void) {
     text_panel(22, 24);
     text_at(5, 22, "MELLONI", C_CREAM);
     text_number(13, 22, game.delivered, 2, C_CREAM);
-    text_at(21, 22, "PUNTI", C_CREAM);
+    text_at(19, 22, "INCASSO", C_CREAM);
     text_number(27, 22, game.score, 6, C_CREAM);
     text_center(23, "GRAZIE, MAESTRO!", C_LEMON);
     tr_music_play(&v.music, SONG_ENDING);
@@ -1034,12 +1153,22 @@ static void handle_events(void) {
         int pan = pan_of(e->x);
         switch (e->type) {
         case EV_BUMP: tr_sfx_play(&v.music, SFX_BUMP, pan, 0); break;
-        case EV_CRASH: tr_sfx_play(&v.music, SFX_CRASH, pan, 0); break;
+        case EV_CRASH:
+            tr_sfx_play(&v.music, SFX_CRASH, pan, 0);
+            if (e->value == CAR_PARKED) hud_say(MSG_PARKED, 45);
+            break;
         case EV_SCRAPE: tr_sfx_play(&v.music, SFX_SCRAPE, pan, 0); break;
         case EV_SPILL: tr_sfx_play(&v.music, SFX_SPILL, pan, 0); break;
         case EV_RECOVER: tr_sfx_play(&v.music, SFX_RECOVER, pan, 0); break;
         case EV_STOLEN: tr_sfx_play(&v.music, SFX_STOLEN, pan, 0); break;
-        case EV_DELIVER: tr_sfx_play(&v.music, SFX_DELIVER, pan, 0); break;
+        case EV_DELIVER:
+            tr_sfx_play(&v.music, SFX_SOLD, pan, e->value & 7);
+            if (e->value >= TR_DELIVERY || !game.melons) hud_say(MSG_SOLD, 60);
+            break;
+        case EV_MISSED:
+            tr_sfx_play(&v.music, SFX_MISSED, pan, 0);
+            hud_say(MSG_MISSED, 60);
+            break;
         case EV_FOOD: tr_sfx_play(&v.music, SFX_FOOD, pan, 0); break;
         case EV_HORN: tr_sfx_play(&v.music, SFX_HORN, 1, 0); break;
         case EV_TIME_LOW:

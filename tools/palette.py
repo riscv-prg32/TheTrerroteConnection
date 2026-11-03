@@ -39,45 +39,67 @@ def cube_index(color: int) -> int:
     return 16 + r * 36 + g * 6 + b
 
 
-# Colours shared by every screen: road, ground, sprites, interface. Their order
-# is the order of the first FIXED_COUNT entries of the cartridge's line palette.
-FIXED = {
-    "ink": "#15121c",     # outlines, tyres, HUD band
-    "cream": "#fff6df",   # text, highlights, road lines
+# Colours shared by every screen. The first 32 are the sprites' colours: sprite
+# rows are run-length coded with 5 bits of colour, so a sprite can only use
+# these. The next 16 belong to the road and the ground and are drawn by code.
+# Their order is the order of the first FIXED_COUNT entries of the line palette.
+SPRITE_FIXED = {
+    "ink": "#15121c",     # outlines, tyres, HUD lettering
+    "cream": "#fff6df",   # text, highlights
     "lemon": "#ffd84a",   # highlighted text, signs
-    "skin": "#eeb088",
+    "skin": "#e0967e",
     "skind": "#a8664a",
-    "red": "#d92b25",     # kerbs, tail lights, melon flesh
+    "skinl": "#f8d0aa",
+    "red": "#d92b25",     # tail lights, melon flesh, awnings
     "redd": "#7d1a20",
+    "redl": "#f2705a",
     "blue": "#7cc4e0",    # the Ape's body: the classic pale blue
     "blued": "#3d7ea6",
     "navy": "#1d3a6b",
-    "grey": "#a8aab2",    # chrome, trucks' shadow side
-    "greyd": "#5f626c",
-    "white": "#e8e6dc",   # trucks, mozzarella
-    "melon": "#2f8f3d",   # watermelon rind
+    "denim": "#4a5e9c",
+    "glass": "#d4d3cc",
+    "grey": "#a8aab2",
+    "greyd": "#5b5c62",
+    "greyl": "#d4d3cc",   # stone, signs, chrome
+    "shade": "#34313b",   # tyres' sides, shadows
+    "white": "#f8fce6",   # trucks, mozzarella
+    "melon": "#2f8f3d",   # watermelon rind, leaves
     "melond": "#14532b",
+    "olive": "#6f7d3c",   # bins, shutters
     "orange": "#ef8a1f",
+    "gold": "#d6a22c",
     "brown": "#6b4326",
-    "tan": "#c7985c",     # provola, crates
+    "brownl": "#b48c58",
+    "tan": "#d2a466",     # provola, crates
+    "rust": "#a4492e",
+    "hair": "#3c2418",
     "pink": "#e77fa8",
     "purple": "#6a3d98",
-    "road": "#55565c",    # asphalt, two tones
-    "road2": "#494a51",
-    "line": "#d9d8cc",    # lane paint
+    "clear": "#15121c",   # transparency in sprites: never drawn, same value as ink
+}
+GROUND_FIXED = {
+    "road": "#5b5c62",    # asphalt
+    "patch": "#36383c",   # a patch on it
+    "line": "#d4d3cc",    # lane paint
+    "basalt": "#4e5068",  # the basoli of the old streets
+    "joint": "#77727c",   # and the joints between them
+    "kerb": "#d2d0c0",    # the stone kerb
+    "kerbd": "#77727c",
     "pave": "#b3a896",    # pavement, two tones
     "pave2": "#a0957f",
     "sea": "#2a7ea8",     # sea beside the road, two tones
-    "sea2": "#3392b8",
-    "sand": "#e3c78d",    # beach, two tones
+    "sea2": "#3398be",
+    "sand": "#e8d290",    # beach, two tones
     "sand2": "#d4b478",
     "grass": "#4d8a3a",   # verge, two tones
     "grass2": "#3f7732",
-    "tuff": "#b08a4e",    # the yellow tuff of Naples
+    "tuff": "#b48c32",    # the yellow tuff of Naples
 }
+FIXED = {**SPRITE_FIXED, **GROUND_FIXED}
+SPRITE_COUNT = len(SPRITE_FIXED)
 FIXED_COUNT = len(FIXED)
-assert FIXED_COUNT == 32
-VIEW_COLORS = 32          # each view adds up to this many: 64 in the line palette
+assert SPRITE_COUNT == 32 and FIXED_COUNT == 48
+VIEW_COLORS = 64          # each view adds up to this many: 112 in the line palette
 
 
 def _cell_bounds(cell: int):
@@ -167,5 +189,5 @@ def check(palette: list[int]) -> int:
 
 if __name__ == "__main__":
     n = check(FIXED_RGB565)
-    print(f"palette: {FIXED_COUNT} fixed colours, {n} collisions")
+    print(f"palette: {FIXED_COUNT} fixed colours ({SPRITE_COUNT} for sprites), {n} collisions")
     raise SystemExit(1 if n else 0)

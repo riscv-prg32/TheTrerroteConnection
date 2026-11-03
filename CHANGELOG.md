@@ -1,11 +1,28 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 (2026-11-04)
 
 The road from Pozzuoli now goes inland to Casoria before turning back to the sea: six legs instead of five,
 Pozzuoli → Casoria, Casoria → Torregaveta, Torregaveta → Mondragone, Mondragone → Baia Domizia. A new view of
-Casoria, painted like the others. Patrizia now waits by the road at the finish of the last leg. The cartridge has
-about 1.5 KB left in its 64 KiB slot. Not yet run on the board.
+Casoria, painted like the others. Patrizia now waits by the road at the finish of the last leg.
+
+The cartridge now uses PRG32's 128 KiB profile (package 96,155 bytes, measured; it no longer fits the 64 KiB profile) and every asset was redone, to make the road a
+Neapolitan street and not another arcade racer:
+
+- **The street.** Basalt setts, asphalt and worn asphalt by section; pavements instead of rumble strips; zebra
+  crossings in town; double-parked cars with their hazards on, which traffic steers round; washing lines across the
+  lane, shrines, bins. Each leg ends at its town's road sign.
+- **Stalls need a stop.** Pull over on the stall's side and stop; the melons are handed over one at a time. Driving
+  past loses the stall. Time limits are 2 to 11 s longer.
+- **A delivery docket** at the top: time, melons, takings and the route.
+- **Art.** All sprites redrawn with outlines and shading; views with 64 colours instead of 32, softer skies, sea foam,
+  shaded houses.
+- **Sound.** The accompaniment varies through each song: bass approaches, walking bass, fills, held chords. New
+  sounds for a melon sold and a stall missed.
+
+Run briefly on the board (firmware `82b8925`, 128 KiB profile): menus and leg 1 work, about 18.5 fps driving
+(median, measured). The rest of the journey has not been driven on the board. The Store splash and icon are new: a
+QEMU frame of the attract mode and the redrawn Trerrote.
 
 ## 1.0.1 (2026-10-30)
 
