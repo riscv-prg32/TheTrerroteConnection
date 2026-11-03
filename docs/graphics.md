@@ -98,7 +98,9 @@ drag a full-width band of sky along with the road.
 per frame in play on average, against 37,371 before; modelled, not timed). On the board (firmware `82b8925`, 128 KiB
 profile) it measured 15.7 to 25.6 fps driving leg 1, median about 18.5, over six 5-second windows, and 20 to 30 fps in
 attract and the menus. That is at least as fast as 1.0.1, but it was a different firmware and a hand-driven session,
-not the scripted run above, so the two are not strictly comparable. See [testing.md](testing.md).
+not the scripted run above, so the two are not strictly comparable. The 1.1.0 cartridge from the Store bundle, on firmware
+`c53c491-dirty`, measured 15.7 to 27.5 fps driving leg 1, median about 21.9, over ten windows of a scripted blind run
+that partly drove on the pavement. See [testing.md](testing.md).
 
 The fixed timestep holds game speed down to about 10 fps (three ticks a frame). Below that the game runs slightly
 slow. Busy scenes with pines and houses reached a low of about 12 fps in these runs, so the margin is real but not large.

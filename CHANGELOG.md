@@ -24,6 +24,9 @@ Run briefly on the board (firmware `82b8925`, 128 KiB profile): menus and leg 1 
 (median, measured). The rest of the journey has not been driven on the board. The Store splash and icon are new: a
 QEMU frame of the attract mode and the redrawn Trerrote.
 
+The bundle's cartridge was then run on the board (firmware `c53c491-dirty`): menus, pause, leg 1 up to the Molo
+Beverello and the missed-ferry screen work; about 22 fps driving (median, measured).
+
 ## 1.0.1 (2026-10-30)
 
 From the first run on a physical ESP32-C6. A button press landing on a frame with no game tick is no longer lost.

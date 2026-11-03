@@ -63,7 +63,7 @@ In QEMU: `w a s d`, `j` for A, `k` for B, and Enter.
 
 ## Status
 
-Release 1.1.0, which needs the 128 KiB cartridge profile, runs on the PRG32 firmware under QEMU and on the PRG32-QT core, and passes the Cartridge Store's own ingestion check. An earlier build of the same source, with an older PRG32, has run on a physical ESP32-C6 through the menus and leg 1, at about 18.5 frames per second driving (median, measured). Release 1.0.1 ran there at about 17 frames per second in play. **It has not been played by people, the whole journey has not been driven on the board, and nobody has heard the soundtrack.** See [docs/testing.md](docs/testing.md).
+Release 1.1.0, which needs the 128 KiB cartridge profile, runs on the PRG32 firmware under QEMU and on the PRG32-QT core, and passes the Cartridge Store's own ingestion check. The bundle's own cartridge has run on a physical ESP32-C6 through the menus and most of leg 1, at about 22 frames per second driving (median, measured). Release 1.0.1 ran there at about 17 frames per second in play. **It has not been played by people, the whole journey has not been driven on the board, and nobody has heard the soundtrack.** See [docs/testing.md](docs/testing.md).
 
 ## Download
 
