@@ -522,6 +522,13 @@ static void build_road_sprites(void) {
             place(SPR_FOOD0 + game.food_next, z, where, 6 + (int)((v.app_tick >> 3) & 3u), 36, 36, 0);
         }
     }
+    /* At the end of the journey Patrizia waits by the road, waving. */
+    if (game.level == LEVEL_COUNT - 1) {
+        int z = ((int)game.length << 8) - game.pos;
+        tr_section_t s = tr_section_at(&game, game.length - 1u);
+        if (z >= 40 && z <= TR_DRAW_SEGS << 8)
+            place(SPR_PATRIZIA, z, tr_edge(s.width) + 40, (int)((v.app_tick >> 3) & 1u) * 4, 40, 58, 0);
+    }
     /* Potholes and the roadside, walking away from the camera. */
     int sec = tr_section_index(&game, base);
     tr_section_t s = tr_section_read(game.sec_first + sec);
@@ -758,7 +765,7 @@ static void tribute_screen(void) {
     v.hud = 0;
     v.lower = LOWER_SAND;
     v.shift = 0;
-    view_load(6);
+    view_load(VIEW_BAIA);
     text_clear();
     clear_sprites();
     text_panel(11, 24);
@@ -787,7 +794,7 @@ static void title_screen(void) {
     tr_new_game(&game, 0, 1);
     game.melons = TR_MELONS_FULL;
     game.spd = 60;
-    view_load(0);
+    view_load(VIEW_VILLA);
     text_clear();
     text_big(0, "THE TRERROTE", C_LEMON);
     text_big(2, "CONNECTION", C_CREAM);
@@ -837,6 +844,10 @@ static void intro_screen(int level) {
         text_center(18, "ATTENTO A LA MONNEZZA DELLA GENTE", C_CREAM);
         break;
     case 3:
+        text_center(17, "DALL'ASSE MEDIANO FINO AL MARE", C_CREAM);
+        text_center(18, "I TAMARRI NON DANNO PRECEDENZA", C_CREAM);
+        break;
+    case 4:
         text_center(17, "BUCHE, TAMARRI E IL CAMION", C_CREAM);
         text_center(18, "DELLE MOZZARELLE", C_CREAM);
         break;
@@ -883,7 +894,7 @@ static void loading_screen(void) {
     v.lower = LOWER_SAND;
     v.shift = 0;
     v.load_count = 0;
-    view_load(2);
+    view_load(VIEW_ISCHIA);
     text_clear();
     clear_sprites();
     text_panel(0, 1);
@@ -946,7 +957,7 @@ static void ending_screen(void) {
     v.hud = 0;
     v.lower = LOWER_SAND;
     v.shift = 0;
-    view_load(6);
+    view_load(VIEW_BAIA);
     text_clear();
     clear_sprites();
     /* What is left on the Ape goes to the beach bars: the last delivery. */

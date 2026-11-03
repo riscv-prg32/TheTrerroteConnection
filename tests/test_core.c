@@ -34,7 +34,7 @@ static int count_events(int type) {
 }
 
 static void test_tables(void) {
-    CHECK(LEVEL_COUNT == 5);
+    CHECK(LEVEL_COUNT == 6);
     for (int l = 0; l < LEVEL_COUNT; ++l) {
         tr_new_game(&g, l, 1);
         CHECK(g.length == level_table[l][4]);
@@ -178,35 +178,38 @@ static void test_potholes(void) {
 }
 
 static void test_anchors(void) {
-    start(2);
+    /* Pozzuoli to Casoria, then Casoria to Torregaveta. */
     int stalls = 0, foods = 0;
-    for (int i = 0; i < g.anchor_count; ++i) {
-        const uint8_t *a = anchor_data + (g.anchor_first + i) * 4;
-        uint32_t seg = (uint32_t)(a[1] | (a[2] << 8));
-        int where = (int8_t)a[3];
-        if (a[0] == ANCHOR_STALL) {
-            /* The wrong side of the road delivers nothing. */
-            g.x = (int16_t)(-where * 100);
-            int m = g.melons;
-            tr_cross_segment(&g, seg);
-            CHECK(g.melons == m);
-            g.x = (int16_t)(where * 100);
-            tr_cross_segment(&g, seg);
-            CHECK(g.melons == m - TR_DELIVERY);
-            ++stalls;
-        } else {
-            int next = g.food_next;
-            g.x = (int16_t)where;
-            tr_cross_segment(&g, seg);
-            CHECK(g.food_next == next + 1);
-            /* It is taken: passing again does nothing. */
-            tr_cross_segment(&g, seg);
-            CHECK(g.food_next == next + 1);
-            ++foods;
+    for (int l = 2; l <= 3; ++l) {
+        start(l);
+        for (int i = 0; i < g.anchor_count; ++i) {
+            const uint8_t *a = anchor_data + (g.anchor_first + i) * 4;
+            uint32_t seg = (uint32_t)(a[1] | (a[2] << 8));
+            int where = (int8_t)a[3];
+            if (a[0] == ANCHOR_STALL) {
+                /* The wrong side of the road delivers nothing. */
+                g.x = (int16_t)(-where * 100);
+                int m = g.melons;
+                tr_cross_segment(&g, seg);
+                CHECK(g.melons == m);
+                g.x = (int16_t)(where * 100);
+                tr_cross_segment(&g, seg);
+                CHECK(g.melons == m - TR_DELIVERY);
+                ++stalls;
+            } else {
+                int next = g.food_next;
+                g.x = (int16_t)where;
+                tr_cross_segment(&g, seg);
+                CHECK(g.food_next == next + 1);
+                /* It is taken: passing again does nothing. */
+                tr_cross_segment(&g, seg);
+                CHECK(g.food_next == next + 1);
+                ++foods;
+            }
         }
     }
     CHECK(stalls == 2);
-    CHECK(foods == 3);
+    CHECK(foods == 4);
 }
 
 /* There must be enough chances on the road for all five foods and all the stalls. */

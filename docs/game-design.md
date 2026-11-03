@@ -2,17 +2,20 @@
 
 ## The journey
 
-Five legs, each against the clock, on a road measured in segments of about a metre (`tools/levels.py`).
+Six legs, each against the clock, on a road measured in segments of about a metre (`tools/levels.py`).
 
 | Leg | From, to | Length | Time | Traffic style | View, then |
 |---|---|---:|---:|---|---|
 | 1 | Villa Comunale, Molo Beverello | 1,340 | 90 s | The jam | Lungomare, Porto |
 | 2 | Ischia Alta, Ischia Porto | 1,060 | 112 s | Lanes | Ischia |
-| 3 | Pozzuoli, Torregaveta | 1,280 | 96 s | Tamarri | Pozzuoli, Torregaveta |
-| 4 | Torregaveta, Mondragone | 1,420 | 105 s | Mozzarella truck | Torregaveta, Mondragone |
-| 5 | Mondragone, Baia Domizia | 1,440 | 100 s | Everything | Mondragone, Baia Domizia |
+| 3 | Pozzuoli, Casoria | 1,080 | 84 s | Tamarri | Pozzuoli, Casoria |
+| 4 | Casoria, Torregaveta | 1,010 | 80 s | Tamarri | Casoria, Torregaveta |
+| 5 | Torregaveta, Mondragone | 1,420 | 105 s | Mozzarella truck | Torregaveta, Mondragone |
+| 6 | Mondragone, Baia Domizia | 1,440 | 100 s | Everything | Mondragone, Baia Domizia |
 
-Between them: the ferry to Ischia, the loading of the 24 melons, the ferry to Pozzuoli.
+Between them: the ferry to Ischia, the loading of the 24 melons, the ferry to Pozzuoli. From Pozzuoli the road goes inland
+by the Tangenziale to Casoria, then back to the sea by the Asse Mediano, Licola and Cuma. At the end of the last
+leg Patrizia waits by the road at Baia Domizia.
 
 ## The Ape
 
@@ -45,5 +48,5 @@ Nobody is ever run over: pedestrians jump clear.
 ## Tuning choices
 
 The first version ended the game whenever the load reached zero. That punished good deliveries, since delivering
-all you have empties the Ape, and it sank 60% of the autoplayer runs that reached leg 5. The rule above replaced it.
+all you have empties the Ape, and it sank 60% of the autoplayer runs that reached the last leg. The rule above replaced it.
 See [balance.md](balance.md).

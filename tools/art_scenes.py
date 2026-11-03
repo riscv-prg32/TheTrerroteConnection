@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The seven views of the journey, painted from what stands at each real place.
+"""The eight views of the journey, painted from what stands at each real place.
 
 Every view is 368 x 80 (320 on screen plus 24 pixels each side for parallax),
 looking across the road, and is painted with Pillow at three times that size
@@ -325,7 +325,72 @@ def pozzuoli() -> Image.Image:
     return p.done()
 
 
-# ---- 5. Torregaveta: the tuff cliff, the Cumana terminus, Procida and Epomeo --
+# ---- 5. Casoria: the plain north of Naples, Somma-Vesuvius seen from behind ---
+def casoria() -> Image.Image:
+    p = Paint(50)
+    p.sky([(0, (120, 174, 216)), (36, (184, 206, 218)), (60, (226, 218, 200))])
+    p.cloud(70, 9, 70, (246, 242, 234))
+    p.cloud(300, 14, 90, (246, 242, 234))
+    # From the north the volcano shows its other face: the long wall of Monte
+    # Somma in front, the cone of Vesuvius just showing over its right shoulder.
+    p.ridge(150, 368, [(150, 2), (200, 22), (236, 34), (262, 38), (288, 34), (316, 26), (368, 8)],
+            62, (132, 132, 150), 0.7)
+    p.ridge(270, 352, [(270, 30), (298, 44), (312, 46), (330, 40), (352, 24)], 62, (150, 146, 160), 0.5)
+    p.ridge(150, 368, [(150, 1), (220, 12), (262, 18), (300, 14), (368, 4)], 62, (110, 120, 112), 0.8)
+    # The old centre: houses, and the bell tower and dome of San Mauro Abate.
+    p.houses(0, 150, 62, 8, 16, [(226, 200, 160), (218, 182, 146), (234, 218, 188), (206, 186, 160)],
+             roof=(164, 108, 82), wmin=6, wmax=11, windows=(102, 90, 84))
+    church, churchd, dome = (238, 222, 192), (200, 182, 152), (110, 128, 120)
+    p.rect(54, 34, 26, 28, church)
+    p.rect(74, 34, 6, 28, churchd)
+    p.rect(60, 28, 14, 6, church)
+    p.disc(67, 28, 8, 7, dome)
+    p.rect(66, 18, 2, 4, churchd)
+    p.rect(88, 14, 10, 48, church)
+    p.rect(95, 14, 3, 48, churchd)
+    for y in (20, 32):
+        p.rect(91, y, 4, 6, (70, 64, 66))
+    p.poly([(87, 14), (93, 5), (99, 14)], dome)
+    # The palazzoni of the sixties and seventies, balconies and washing.
+    blocks = [(150, 26, 40), (180, 30, 50), (214, 24, 36), (242, 34, 46), (280, 26, 38), (310, 30, 52), (344, 24, 40)]
+    tones = [(222, 196, 164), (210, 200, 188), (232, 184, 156), (204, 188, 164)]
+    for k, (x, w, h) in enumerate(blocks):
+        c = tones[k % len(tones)]
+        top = 68 - h
+        p.rect(x, top, w, h, c)
+        p.rect(x + w - 3, top, 3, h, tuple(v - 30 for v in c))
+        p.rect(x - 0.5, top - 1.5, w + 1, 1.5, (150, 140, 134))
+        for y in range(int(top + 3), 64, 5):
+            p.rect(x + 1.5, y + 2, w - 5, 1, (150, 140, 134))
+            for wx in range(int(x + 3), int(x + w - 5), 5):
+                p.rect(wx, y, 2, 2, (84, 80, 84))
+            if p.rng.random() < 0.5:
+                lx = x + p.rng.uniform(3, w - 12)
+                for j in range(3):
+                    p.rect(lx + j * 3, y + 3, 2, 1.6, ((240, 240, 236), (214, 82, 70), (80, 130, 186))[j])
+    # The Asse Mediano on its viaduct, carrying the traffic of the plain.
+    deck, decks = (186, 182, 176), (120, 116, 114)
+    p.rect(0, 58, 368, 3, deck)
+    p.rect(0, 61, 368, 1, decks)
+    for x in range(10, 368, 34):
+        p.rect(x, 62, 4, 10, decks)
+    for x, c in ((30, (204, 62, 52)), (96, (236, 236, 230)), (170, (62, 96, 150)), (250, (232, 196, 70)),
+                 (322, (236, 236, 230))):
+        p.rect(x, 55.5, 9, 2.5, c)
+        p.rect(x + 2, 54, 5, 1.5, (90, 110, 130))
+    # The edge of town: a wall of posters, a petrol station, rough verge.
+    p.rect(0, 70, 368, 10, (152, 142, 120))
+    p.rect(0, 70, 368, 1, (186, 176, 150))
+    for x, c in ((20, (236, 200, 70)), (44, (214, 82, 70)), (68, (80, 130, 186)), (92, (236, 236, 230))):
+        p.rect(x, 64, 20, 8, c)
+    p.rect(250, 64, 40, 2, (222, 64, 52))
+    p.rect(254, 66, 3, 6, (200, 196, 190))
+    p.rect(282, 66, 3, 6, (200, 196, 190))
+    p.rect(264, 68, 6, 4, (236, 236, 230))
+    return p.done()
+
+
+# ---- 6. Torregaveta: the tuff cliff, the Cumana terminus, Procida and Epomeo --
 def torregaveta() -> Image.Image:
     p = Paint(55)
     p.sky([(0, (118, 170, 212)), (40, (196, 212, 214)), (60, (244, 222, 180))])
@@ -372,7 +437,7 @@ def torregaveta() -> Image.Image:
     return p.done()
 
 
-# ---- 6. Mondragone: Monte Petrino and its ruined Rocca, the flat coast --------
+# ---- 7. Mondragone: Monte Petrino and its ruined Rocca, the flat coast --------
 def mondragone() -> Image.Image:
     p = Paint(66)
     p.sky([(0, (130, 164, 204)), (36, (214, 206, 196)), (60, (250, 212, 158))])
@@ -419,7 +484,7 @@ def mondragone() -> Image.Image:
     return p.done()
 
 
-# ---- 7. Baia Domizia at sunset: the pines, the umbrellas, Ponza on the horizon -
+# ---- 8. Baia Domizia at sunset: the pines, the umbrellas, Ponza on the horizon -
 def baia_domizia() -> Image.Image:
     p = Paint(77)
     p.sky([(0, (86, 104, 168)), (24, (196, 128, 142)), (46, (248, 170, 110)), (62, (254, 214, 130))])
@@ -456,6 +521,7 @@ VIEWS = [
     ("porto", "Molo Beverello, Naples", porto),
     ("ischia", "Ischia Ponte", ischia),
     ("pozzuoli", "Pozzuoli", pozzuoli),
+    ("casoria", "Casoria", casoria),
     ("torregaveta", "Torregaveta", torregaveta),
     ("mondragone", "Mondragone", mondragone),
     ("baia", "Baia Domizia", baia_domizia),

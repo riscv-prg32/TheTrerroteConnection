@@ -39,8 +39,8 @@ in the tool. Melodies must use chord tones on beats 1 and 3, checked at build ti
 | L'inno del mellone | A minor | 4 frames | 114 BPM | Tribute, title |
 | Lungomare | A minor | 3 frames | 152 BPM | Leg 1 |
 | Ischia | F major | 4 frames | 114 BPM | Leg 2 |
-| Strada | D minor | 3 frames | 152 BPM | Legs 3, 4 |
-| Tramonto | G major | 4 frames | 114 BPM | Leg 5 |
+| Strada | D minor | 3 frames | 152 BPM | Legs 3, 4, 5 |
+| Tramonto | G major | 4 frames | 114 BPM | Leg 6 |
 | Six jingles | various | 3 to 6 frames | | Ready, loading, ferry, arrival, game over, ending |
 
 The style is that of Neapolitan cassette pop: oom-pah from a drum machine and organ, mandolin tremolo, minor keys,

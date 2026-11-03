@@ -18,9 +18,10 @@ You drive a Trerrote, the three-wheeled Ape Car, and you deliver watermelons.
 |---|---|---|
 | 1 | **Villa Comunale → Molo Beverello**, Naples | Beat the traffic jam and catch the ferry to Ischia |
 | 2 | **Ischia**, loaded with 24 melons, down to the port | Narrow lanes and many turns: take them too fast and the melons leave |
-| 3 | **Pozzuoli → Torregaveta** | Deliver to the stalls, past *la monnezza della gente* |
-| 4 | **Torregaveta → Mondragone** | Potholes, tamarri, and the mozzarella truck |
-| 5 | **Mondragone → Baia Domizia** | All of it at once, with the sun going down |
+| 3 | **Pozzuoli → Casoria** | Deliver to the stalls, past *la monnezza della gente* |
+| 4 | **Casoria → Torregaveta** | Down the Asse Mediano and back to the sea, where the tamarri give way to nobody |
+| 5 | **Torregaveta → Mondragone** | Potholes, tamarri, and the mozzarella truck |
+| 6 | **Mondragone → Baia Domizia** | All of it at once, with the sun going down, and Patrizia waiting at the finish |
 
 **A melon that falls keeps going.** Hit something and the Ape stops but the melon flies on along the road. Drive over
 it to get it back, before a passer-by or another car does. The horn scatters the thieves, and sometimes even moves the
@@ -50,7 +51,7 @@ In QEMU: `w a s d`, `j` for A, `k` for B, and Enter.
 ## What it shows off
 
 - **Eight-bit indexed colour:** every row reaches the firmware as an indexed sprite, with exact palettes solved against the firmware's quantiser: up to 64 colours per screen.
-- **Seven views of the real places**, painted by code: Castel dell'Ovo and Vesuvius, the Maschio Angioino, the Castello Aragonese, the Serapeum of Pozzuoli, the tuff of Torregaveta, Monte Petrino, the pines of Baia Domizia. About 2.5 KB each.
+- **Eight views of the real places**, painted by code: Castel dell'Ovo and Vesuvius, the Maschio Angioino, the Castello Aragonese, the Serapeum of Pozzuoli, the palazzoni and San Mauro of Casoria, the tuff of Torregaveta, Monte Petrino, the pines of Baia Domizia. About 1.5 to 3.7 KB each.
 - **A pseudo-3D road in a 64 KiB cartridge:** a row compositor that holds one row in memory, not one frame. Nothing is ever erased, so nothing flickers.
 - **Eight SID-like voices:** an original soundtrack in the manner of Neapolitan cassette pop, stereo effects that follow the action, and an engine that coughs like a two-stroke. It plays in mono on the default firmware and in stereo on an Audio Plus build.
 - **Evidence:** millions of test checks, a repaint test of the renderer, a Monte Carlo balance study, and a build meant to reproduce byte for byte.

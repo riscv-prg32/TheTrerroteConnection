@@ -114,6 +114,14 @@ static int play_leg(const char *name, int shot_at) {
             shot(label);
             taken = 2;
         }
+        /* On the last leg Patrizia waits at the finish: she must be on screen. */
+        if (taken == 2 && game.level == LEVEL_COUNT - 1 && (int)game.length - (int)(game.pos >> 8) <= TR_PLAYER_Z / 256 + 8) {
+            int seen = 0;
+            for (int i = 0; i < v.count; ++i) seen |= v.cur[i].id == SPR_PATRIZIA;
+            CHECK(seen);
+            shot("patrizia");
+            taken = 3;
+        }
     }
     frame(0);   /* let go of the pedals */
     return v.app;
@@ -161,9 +169,10 @@ static void test_full_game(void) {
     press(PRG32_BTN_START);
     CHECK(v.app == APP_PLAY);
 
-    static const char *legs[5] = {"leg1", "leg2", "leg3", "leg4", "leg5"};
-    for (int leg = 0; leg < 5; ++leg) {
-        int app = play_leg(legs[leg], leg == 0 ? 30 : 25);
+    for (int leg = 0; leg < LEVEL_COUNT; ++leg) {
+        char name[8];
+        snprintf(name, sizeof name, "leg%d", leg + 1);
+        int app = play_leg(name, leg == 0 ? 30 : 25);
         if (app == APP_GAMEOVER) {
             printf("journey ended on leg %d: melons %d time %lu\n", leg + 1, game.melons, (unsigned long)game.ticks);
             shot("gameover");
@@ -184,7 +193,7 @@ static void test_full_game(void) {
             shot(label);
             press(PRG32_BTN_A);
         }
-        if (leg < 4) {
+        if (leg < LEVEL_COUNT - 1) {
             CHECK(v.app == APP_INTRO);
             wait_frames(3);
             snprintf(label, sizeof label, "intro%d", leg + 2);

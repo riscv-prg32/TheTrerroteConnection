@@ -14,6 +14,7 @@ the journey, from morning in Naples to sunset at Baia Domizia.
 | Molo Beverello | Castel Nuovo with dark towers and white arch, the Vomero with Sant'Elmo and the Certosa, Stazione Marittima, a ferry, Vesuvius in the haze |
 | Ischia | Castello Aragonese on its rock with the dome, the Ponte Aragonese, Ischia Ponte's pastel houses, Monte Epomeo |
 | Pozzuoli | The three columns of the Macellum (the "Temple of Serapis") with their bands of mollusc borings, Rione Terra and the Duomo, the port, Capo Miseno, fumes from the Solfatara |
+| Casoria | Monte Somma seen from the north with the cone of Vesuvius over its shoulder, the bell tower and dome of San Mauro Abate, the palazzoni of the sixties and seventies with washing on the balconies, the Asse Mediano on its viaduct, a wall of posters and a petrol station |
 | Torregaveta | The layered tuff of Monte di Procida, the old coastal tower, the red Cumana train, Procida and Epomeo on the horizon |
 | Mondragone | Monte Petrino and its ruined Rocca, the town, the lidos, and the buffalo of the plain |
 | Baia Domizia | Umbrella pines, rows of beach umbrellas, a sunset over the sea (this coast faces west), Monte Massico and Roccamonfina inland, Ponza on the horizon |

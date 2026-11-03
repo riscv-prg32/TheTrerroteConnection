@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The five legs of the journey, as sections of road.
+"""The six legs of the journey, as sections of road.
 
 A section is (length in segments, curve, road width, left ground, right ground,
 left decoration, right decoration, decoration period, traffic, potholes). A
@@ -60,25 +60,39 @@ LEVELS = [
         ],
         "anchors": [(FOOD, 300, -96), (FOOD, 620, 96), (FOOD, 900, 0)],
     },
-    {   # Pozzuoli along via Napoli and the Lucrino shore to Torregaveta.
-        "name": "POZZUOLI", "dest": "TORREGAVETA", "time": 96, "views": (3, 4), "swap": 800, "song": "STRADA",
+    {   # Pozzuoli by via Napoli and Bagnoli, up the Tangenziale past Capodichino to Casoria.
+        "name": "POZZUOLI", "dest": "CASORIA", "time": 84, "views": (3, 4), "swap": 620, "song": "STRADA",
         "style": "tamarri", "melons": -1,
         "sections": [
-            (120, 0, FULL, PAVE, SEA, LAMP, NONE, 14, 4, 2),
-            (130, 2, FULL, TUFF, SEA, NONE, LAMP, 14, 6, 3),
-            (110, -3, FULL, PAVE, SEA, HOUSE, LAMP, 12, 6, 4),
-            (130, 4, FULL, PAVE, SAND, PALM, UMB, 12, 7, 4),
-            (120, 0, FULL, GRASS, SAND, PINE, UMB, 14, 8, 5),
-            (140, -3, FULL, GRASS, SEA, PINE, NONE, 16, 6, 6),
-            (150, 3, NARROW, TUFF, SEA, NONE, NONE, 16, 5, 6),
-            (130, -4, NARROW, TUFF, SAND, NONE, UMB, 14, 5, 5),
-            (120, 1, FULL, PAVE, SAND, HOUSE, UMB, 12, 7, 4),
-            (130, 0, FULL, PAVE, SAND, LAMP, UMB, 12, 5, 2),
+            (110, 0, FULL, PAVE, SEA, LAMP, NONE, 14, 4, 2),
+            (120, 2, FULL, TUFF, SEA, NONE, LAMP, 14, 6, 3),
+            (120, -2, FULL, WALL, PAVE, HOUSE, LAMP, 12, 8, 3),
+            (130, 3, FULL, PAVE, PAVE, LAMP, LAMP, 14, 10, 4),
+            (120, -1, FULL, WALL, WALL, HOUSE, HOUSE, 12, 9, 4),
+            (130, 0, FULL, PAVE, GRASS, LAMP, NONE, 14, 8, 5),
+            (120, 2, NARROW, WALL, WALL, HOUSE, HOUSE, 10, 6, 6),
+            (120, -3, NARROW, WALL, PAVE, HOUSE, LAMP, 10, 7, 5),
+            (110, 0, FULL, PAVE, PAVE, HOUSE, LAMP, 12, 6, 3),
         ],
-        "anchors": [(STALL, 340, RIGHT), (FOOD, 480, -80), (FOOD, 700, 80), (STALL, 880, LEFT), (FOOD, 1050, 0)],
+        "anchors": [(STALL, 380, RIGHT), (FOOD, 540, -80), (FOOD, 820, 80)],
+    },
+    {   # Casoria down the Asse Mediano, past Giugliano and Licola, by Cuma to Torregaveta.
+        "name": "CASORIA", "dest": "TORREGAVETA", "time": 80, "views": (4, 5), "swap": 640, "song": "STRADA",
+        "style": "tamarri", "melons": -1,
+        "sections": [
+            (120, 0, FULL, WALL, PAVE, HOUSE, LAMP, 12, 7, 4),
+            (140, -2, FULL, PAVE, GRASS, LAMP, NONE, 16, 9, 5),
+            (140, 1, FULL, GRASS, GRASS, LAMP, LAMP, 16, 10, 5),
+            (120, 3, FULL, PAVE, GRASS, HOUSE, PINE, 12, 8, 6),
+            (130, -3, FULL, GRASS, GRASS, PINE, PINE, 14, 6, 6),
+            (130, 2, NARROW, GRASS, SAND, PINE, UMB, 14, 5, 5),
+            (120, -4, NARROW, TUFF, SAND, NONE, UMB, 14, 5, 4),
+            (110, 0, FULL, PAVE, SAND, HOUSE, UMB, 12, 5, 2),
+        ],
+        "anchors": [(FOOD, 300, 0), (STALL, 520, LEFT), (FOOD, 800, -80)],
     },
     {   # The Domitiana north: Licola, Castel Volturno, Mondragone. Long and full of holes.
-        "name": "TORREGAVETA", "dest": "MONDRAGONE", "time": 105, "views": (4, 5), "swap": 900, "song": "STRADA",
+        "name": "TORREGAVETA", "dest": "MONDRAGONE", "time": 105, "views": (5, 6), "swap": 900, "song": "STRADA",
         "style": "truck", "melons": -1,
         "sections": [
             (120, 1, FULL, TUFF, SAND, NONE, UMB, 14, 4, 3),
@@ -94,7 +108,7 @@ LEVELS = [
         "anchors": [(STALL, 420, LEFT), (FOOD, 560, 90), (FOOD, 820, -90), (STALL, 1060, RIGHT), (FOOD, 1240, 0)],
     },
     {   # Mondragone to Baia Domizia: the last stretch among the pines, the sun going down.
-        "name": "MONDRAGONE", "dest": "BAIA DOMIZIA", "time": 100, "views": (5, 6), "swap": 900, "song": "TRAMONTO",
+        "name": "MONDRAGONE", "dest": "BAIA DOMIZIA", "time": 100, "views": (6, 7), "swap": 900, "song": "TRAMONTO",
         "style": "everything", "melons": -1,
         "sections": [
             (140, 0, FULL, PAVE, SAND, HOUSE, UMB, 12, 7, 4),

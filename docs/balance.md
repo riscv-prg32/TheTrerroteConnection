@@ -9,7 +9,7 @@ Expect humans to do worse in traffic and better at planned recovery of melons.
 
 ## What the study changed
 
-The first tuning could not be finished at all: 0 of 300 journeys, with 11 to 14 hits a leg. Successive changes:
+The first tuning, on the five-leg journey of 1.0, could not be finished at all: 0 of 300 journeys, with 11 to 14 hits a leg. Successive changes:
 
 | Change | Why |
 |---|---|
@@ -20,7 +20,8 @@ The first tuning could not be finished at all: 0 of 300 journeys, with 11 to 14 
 
 ## Result
 
-The autoplayer now finishes about 93% of journeys, with all five foods, delivering about 18 melons (see the CSV for
-current numbers). Time limits leave it 9 to 17 seconds' margin per leg, by intent: tight for a machine, and probably
+The autoplayer now finishes about 95% of journeys over the six legs, with all five foods, delivering about 16 melons
+(measured over 1,000 journeys; see the CSV for current numbers). Almost all the failures are time running out on the
+last leg. Time limits leave it 10 to 18 seconds' margin per leg, by intent: tight for a machine, and probably
 tighter than that for a person. If play-testers run out of time, widen
 `time` in `tools/levels.py` first.

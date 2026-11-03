@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+The road from Pozzuoli now goes inland to Casoria before turning back to the sea: six legs instead of five,
+Pozzuoli → Casoria, Casoria → Torregaveta, Torregaveta → Mondragone, Mondragone → Baia Domizia. A new view of
+Casoria, painted like the others. Patrizia now waits by the road at the finish of the last leg. The cartridge has
+about 1.5 KB left in its 64 KiB slot. Not yet run on the board.
+
 ## 1.0.1 (2026-10-30)
 
 From the first run on a physical ESP32-C6. A button press landing on a frame with no game tick is no longer lost.

@@ -30,7 +30,7 @@ The cartridge was stored in slot `cart6`, replacing one of six identical copies 
 
 ## Not done
 
-- **The whole journey has not been driven on the board.** The ferries, the loading scene, legs 2 to 4, and the ending have run only on the host and, in part, QEMU.
+- **The whole journey has not been driven on the board.** The ferries, the loading scene, legs 2 to 5, and the ending have run only on the host and, in part, QEMU.
 - **Physical buttons untested:** keys came from the device protocol, which firmware treats the same way, but feel is untested.
 - **Never play-tested by people.** All balance figures come from an autoplayer. The controls may feel wrong, and balance was tuned at a nominal 30 fps of control.
 - **Nobody has listened to the music,** on any host, including the board's speaker. See [audio.md](audio.md).
